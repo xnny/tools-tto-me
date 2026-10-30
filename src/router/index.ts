@@ -22,6 +22,12 @@ const router = createRouter({
       component: () => import('@/views/TimezoneConverter.vue'),
       meta: { title: '时间戳转换' },
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { title: '页面未找到' },
+    },
   ],
 })
 
