@@ -107,12 +107,6 @@ export function readDomainConfig(env) {
                 primaryValue,
                 'CLOUDFLARE_PAGES_CUSTOM_DOMAIN',
         );
-        if (!env.CLOUDFLARE_PAGES_REDIRECT_DOMAINS?.trim()) {
-                throw new Error(
-                        'Missing Cloudflare configuration: CLOUDFLARE_PAGES_REDIRECT_DOMAINS',
-                );
-        }
-
         const redirectDomains = [];
         const seen = new Set();
 
@@ -138,12 +132,6 @@ export function readDomainConfig(env) {
                         redirectDomains.push(hostname);
                 }
         }
-        if (redirectDomains.length === 0) {
-                throw new Error(
-                        'CLOUDFLARE_PAGES_REDIRECT_DOMAINS must include at least one hostname.',
-                );
-        }
-
         return { primaryDomain, redirectDomains };
 }
 
@@ -163,7 +151,10 @@ function loadCloudflareEnvironment({ env, projectRoot }) {
                 }
 
                 for (const key of envKeys) {
-                        if (!environment[key]?.trim() && fileEnv[key]?.trim()) {
+                        const shouldLoadFromFile = key === 'CLOUDFLARE_PAGES_REDIRECT_DOMAINS'
+                                ? environment[key] === undefined
+                                : !environment[key]?.trim();
+                        if (shouldLoadFromFile && fileEnv[key]?.trim()) {
                                 environment[key] = fileEnv[key];
                         }
                 }
@@ -1099,7 +1090,6 @@ export async function main({
                 'CLOUDFLARE_ACCOUNT_ID',
                 'CLOUDFLARE_API_TOKEN',
                 'CLOUDFLARE_PAGES_CUSTOM_DOMAIN',
-                'CLOUDFLARE_PAGES_REDIRECT_DOMAINS',
         ];
         const missingKeys = requiredKeys.filter((key) => !environment[key]?.trim());
         if (missingKeys.length > 0) {
