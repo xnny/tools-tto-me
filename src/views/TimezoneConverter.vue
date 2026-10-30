@@ -115,100 +115,197 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="timezone-page">
-    <h1 class="timezone-now">当前{{ timezoneLabel }}时间：{{ currentTime }}</h1>
-    <p class="timezone-hint">
-      一行一个：YYYY-MM-DD HH:mm:ss 或 时间戳（秒），时区：{{ timezoneLabel }}
-    </p>
-    <div class="timezone-layout">
-      <div class="timezone-form">
-        <label class="label" for="timezone-input">Input:</label>
+  <main class="timezone-page">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">TIMESTAMP</p>
+        <h1>时间戳转换</h1>
+        <p class="subtitle">一行一个：YYYY-MM-DD HH:mm:ss 或 时间戳（秒），时区：{{ timezoneLabel }}</p>
+      </div>
+    </div>
+
+    <section class="now-card" aria-label="当前时间">
+      <div class="now-item">
+        <span class="now-label">当前 {{ timezoneLabel }} 时间</span>
+        <span class="now-value">{{ currentTime }}</span>
+      </div>
+      <div class="now-item">
+        <span class="now-label">当前时间戳（秒）</span>
+        <span class="now-value">{{ nowSeconds }}</span>
+      </div>
+    </section>
+
+    <section class="converter-card" aria-label="转换">
+      <div class="pane">
+        <label class="pane-label" for="timezone-input">输入</label>
         <textarea
           id="timezone-input"
           v-model="inputValue"
           rows="12"
+          spellcheck="false"
           placeholder="YYYY-MM-DD HH:mm:ss 或 时间戳（秒）"
         ></textarea>
       </div>
-      <div class="timezone-result">
-        <label class="label" for="timezone-output">Result:</label>
-        <textarea
-          id="timezone-output"
-          :value="outputValue"
-          rows="12"
-          readonly
-        ></textarea>
+      <div class="pane pane-result">
+        <label class="pane-label" for="timezone-output">结果</label>
+        <textarea id="timezone-output" :value="outputValue" rows="12" readonly></textarea>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <style scoped>
 .timezone-page {
-  padding: 32px 20px;
-  max-width: 960px;
+  max-width: 1000px;
   margin: 0 auto;
-
-  h1 {
-    margin-bottom: 12px;
-    text-align: center;
-  }
+  padding: 58px 24px 72px;
 }
 
-.timezone-layout {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+.page-heading {
+  margin-bottom: 28px;
 }
 
-.timezone-form,
-.timezone-result {
-  flex: 1 1 320px;
-  min-width: 280px;
-  max-width: 520px;
+.eyebrow {
+  margin: 0 0 8px;
+  color: #3c80d9;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
 }
 
-.timezone-result {
-  font-weight: 600;
+h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 32px;
+  line-height: 1.2;
 }
 
-.timezone-hint {
-  margin-bottom: 12px;
-  color: #6b7280;
-  font-size: 13px;
-  text-align: center;
+.subtitle {
+  margin: 9px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
 }
 
-.timezone-now {
+.now-card,
+.converter-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.now-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 16px;
-  font-weight: 600;
-  text-align: center;
 }
 
-.label {
-  display: block;
-  margin-bottom: 8px;
+.now-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 22px;
+}
+
+.now-item + .now-item {
+  border-left: 1px solid #edf1f6;
+}
+
+.now-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.now-value {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.converter-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 22px 22px;
+}
+
+.pane-result {
+  background: #f5f9ff;
+  border-left: 1px solid #edf1f6;
+}
+
+.pane-label {
+  margin-bottom: 10px;
+  color: var(--color-text-soft);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 textarea {
-  box-sizing: border-box;
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font: inherit;
-  line-height: 1.5;
+  min-height: 280px;
+  padding: 12px 14px;
+  color: var(--color-text);
+  background: #fff;
+  border: 1px solid #dce4ed;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
   resize: vertical;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
-@media (max-width: 768px) {
+textarea::placeholder {
+  color: #b4bdc8;
+}
+
+textarea:focus {
+  border-color: #4b94e9;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(75, 148, 233, 0.15);
+}
+
+textarea[readonly] {
+  color: #2c4a75;
+  background: #fbfdff;
+}
+
+@media (max-width: 700px) {
   .timezone-page {
-    padding: 20px 16px;
+    padding: 30px 12px 48px;
   }
 
-  .timezone-layout {
-    gap: 12px;
+  .now-card,
+  .converter-card {
+    grid-template-columns: 1fr;
+  }
+
+  .now-item + .now-item,
+  .pane-result {
+    border-top: 1px solid #edf1f6;
+    border-left: 0;
+  }
+
+  .now-value {
+    font-size: 18px;
+  }
+
+  .pane {
+    padding: 14px;
+  }
+
+  textarea {
+    min-height: 200px;
   }
 }
 </style>

@@ -1,19 +1,33 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+const SITE_NAME = 'TTO Tools'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/',
+      name: 'Home',
+      component: () => import('@/views/HomeView.vue'),
+    },
+    {
       path: '/calendar',
       name: 'Calendar',
-      component: () => import('@/views/Calendar.vue'),
+      component: () => import('@/views/CalendarView.vue'),
+      meta: { title: '日历' },
     },
     {
       path: '/timezone/:zone(utc[+-]\\d{1,2})?',
       name: 'TimezoneConverter',
-      component: () => import('@/views/TimezoneConverter.vue')
+      component: () => import('@/views/TimezoneConverter.vue'),
+      meta: { title: '时间戳转换' },
     },
   ],
+})
+
+router.afterEach((to) => {
+  const title = to.meta.title as string | undefined
+  document.title = title ? `${title} · ${SITE_NAME}` : SITE_NAME
 })
 
 export default router
