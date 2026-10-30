@@ -747,33 +747,42 @@ export async function findZone({
         fetchImpl = globalThis.fetch,
         apiBaseUrl = defaultApiBaseUrl,
 }) {
-        const query = new URLSearchParams({
-                name: hostname,
-                'account.id': accountId,
-                status: 'active',
-        });
-        const { payload } = await cloudflareRequest({
-                path: `/zones?${query}`,
-                apiToken,
-                fetchImpl,
-                apiBaseUrl,
-        });
+        const normalizedHostname = normalizeHostname(hostname);
+        const labels = normalizedHostname.split('.');
+        // A Pages hostname may be a subdomain of the zone that owns its DNS.
+        // Try the most specific name first, without guessing the public suffix.
+        for (let offset = 0; offset <= labels.length - 2; offset += 1) {
+                const name = labels.slice(offset).join('.');
+                const query = new URLSearchParams({
+                        name,
+                        'account.id': accountId,
+                });
+                const { payload } = await cloudflareRequest({
+                        path: `/zones?${query}`,
+                        apiToken,
+                        fetchImpl,
+                        apiBaseUrl,
+                });
 
-        if (!Array.isArray(payload.result) || payload.result.length !== 1) {
-                throw new Error(`Expected one active Cloudflare zone for "${hostname}".`);
+                if (!Array.isArray(payload.result) || payload.result.length > 1) {
+                        throw new Error(`Expected at most one Cloudflare zone named "${name}".`);
+                }
+                if (payload.result.length === 0) continue;
+
+                const zone = payload.result[0];
+                if (
+                        typeof zone?.id !== 'string' || !zone.id ||
+                        normalizeHostname(zone.name, 'Cloudflare zone') !== name ||
+                        zone.status !== 'active' ||
+                        zone.type !== 'full'
+                ) {
+                        throw new Error(`Cloudflare zone "${name}" must be active and use full setup.`);
+                }
+
+                return zone;
         }
 
-        const zone = payload.result[0];
-        if (
-                typeof zone?.id !== 'string' ||
-                normalizeHostname(zone.name, 'Cloudflare zone') !== hostname ||
-                zone.status !== 'active' ||
-                zone.type !== 'full'
-        ) {
-                throw new Error(`Cloudflare zone "${hostname}" must be active and use full setup.`);
-        }
-
-        return zone;
+        throw new Error(`No active Cloudflare zone found for "${normalizedHostname}" or its parent domains.`);
 }
 
 export async function purgeCustomDomainCache({
