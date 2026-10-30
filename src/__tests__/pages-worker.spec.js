@@ -8,12 +8,18 @@ const env = { ASSETS: { fetch: async () => html() } }
 describe('Pages SPA response status', () => {
   it.each([
     '/', '/calendar', '/CALENDAR/', '/timezone', '/timezone/',
-    '/timezone/utc+8', '/TIMEZONE/UTC-8/', '/timezone/utc+99',
+    '/timezone/utc', '/TIMEZONE/UTC/', '/timezone/utc+8', '/TIMEZONE/UTC-8/', '/timezone/utc+99',
     '/timezone/utf-8', '/timezone/utc8', '/timezone/utc+100',
     '/calendar/extra', '/unknown', '/assets/missing.js',
   ])('matches the client router for %s', async (path) => {
     const response = await worker.fetch(new Request(`https://example.com${path}`), env)
     expect(response.status).toBe(router.resolve(path).name === 'NotFound' ? 404 : 200)
+  })
+
+  it('serves the UTC route successfully', async () => {
+    expect(router.resolve('/timezone/utc').name).toBe('TimezoneConverter')
+    const response = await worker.fetch(new Request('https://example.com/timezone/utc'), env)
+    expect(response.status).toBe(200)
   })
 
   it('preserves static assets and their existing errors', async () => {

@@ -17,7 +17,7 @@ const router = createRouter({
       meta: { title: '日历' },
     },
     {
-      path: '/timezone/:zone(utc[+-]\\d{1,2})?',
+      path: '/timezone/:zone(utc|utc[+-]\\d{1,2})?',
       name: 'TimezoneConverter',
       component: () => import('@/views/TimezoneConverter.vue'),
       meta: { title: '时间戳转换' },
