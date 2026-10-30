@@ -1,18 +1,36 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { dateKey, getCalendarDay, getCalendarMonth } from '@/utils/calendar'
 
-const today = new Date()
-const selectedDate = ref(new Date(today.getFullYear(), today.getMonth(), today.getDate()))
-const year = ref(today.getFullYear())
-const month = ref(today.getMonth() + 1)
+const today = ref(new Date())
+const selectedDate = ref(new Date(today.value.getFullYear(), today.value.getMonth(), today.value.getDate()))
+const year = ref(today.value.getFullYear())
+const month = ref(today.value.getMonth() + 1)
 const holiday = ref('')
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 const years = Array.from({ length: 199 }, (_, index) => 1901 + index)
 const months = Array.from({ length: 12 }, (_, index) => index + 1)
 const days = computed(() => getCalendarMonth(year.value, month.value))
 const selected = computed(() => getCalendarDay(selectedDate.value))
-const todayKey = dateKey(today)
+const todayKey = computed(() => dateKey(today.value))
+const relativeDays = computed(() => {
+  const calendarTime = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  const difference = (calendarTime(selectedDate.value) - calendarTime(today.value)) / 86400000
+  if (difference > 0) return `还有${difference}天`
+  if (difference < 0) return `已经过去${-difference}天`
+  return ''
+})
+
+let midnightTimer: ReturnType<typeof setTimeout> | undefined
+
+function updateToday() {
+  today.value = new Date()
+  const nextMidnight = new Date(today.value.getFullYear(), today.value.getMonth(), today.value.getDate() + 1)
+  midnightTimer = setTimeout(updateToday, nextMidnight.getTime() - today.value.getTime())
+}
+
+onMounted(updateToday)
+onUnmounted(() => clearTimeout(midnightTimer))
 
 function selectDate(date: Date) {
   selectedDate.value = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -116,6 +134,7 @@ function selectHoliday() {
         <aside class="day-detail" aria-live="polite">
           <p class="detail-date">{{ selected.date.getFullYear() }}年{{ selected.date.getMonth() + 1 }}月{{ selected.day }}日 星期{{ weekdays[selected.date.getDay()] }}</p>
           <div class="detail-number">{{ selected.day }}</div>
+          <p v-if="relativeDays" class="detail-relative">{{ relativeDays }}</p>
           <p class="detail-lunar">农历{{ selected.lunarDate }}</p>
           <p class="detail-ganzhi">{{ selected.gzYear }}年 【{{ selected.zodiac }}年】<br>{{ selected.gzMonth }}月 {{ selected.gzDay }}日</p>
           <p v-if="selected.festivals.length || selected.solarTerm" class="detail-festival">{{ [...selected.festivals, selected.solarTerm].filter(Boolean).join(' · ') }}</p>
@@ -169,6 +188,7 @@ select { height: 36px; min-width: 100px; padding: 0 30px 0 12px; color: #425167;
 .day-detail { padding: 25px 22px; background: #f5f9ff; text-align: center; }
 .detail-date { margin: 0 0 18px; color: #6d8098; font-size: 13px; }
 .detail-number { display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; margin: auto; color: white; background: #5798e4; border-radius: 12px; font-size: 49px; font-weight: 300; box-shadow: 0 8px 20px rgba(71, 139, 218, .23); }
+.detail-relative { margin: 12px 0 0; color: #377ed2; font-size: 13px; font-weight: 600; }
 .detail-lunar { margin: 17px 0 7px; color: #364b67; font-size: 16px; font-weight: 600; }
 .detail-ganzhi { margin: 0; color: #8a9aac; font-size: 12px; line-height: 1.9; }
 .detail-festival { margin: 10px 0 0; color: #e17a66; font-size: 13px; }
