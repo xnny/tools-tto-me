@@ -122,23 +122,22 @@ onBeforeUnmount(() => {
     </p>
     <div class="timezone-layout">
       <div class="timezone-form">
-        <div class="label">Input:</div>
-        <el-input
+        <label class="label" for="timezone-input">Input:</label>
+        <textarea
+          id="timezone-input"
           v-model="inputValue"
-          type="textarea"
-          :autosize="{ minRows: 12, maxRows: 50 }"
+          rows="12"
           placeholder="YYYY-MM-DD HH:mm:ss 或 时间戳（秒）"
-          clearable
-        />
+        ></textarea>
       </div>
       <div class="timezone-result">
-        <div class="label">Result:</div>
-        <el-input
-          :model-value="outputValue"
-          type="textarea"
-          :autosize="{ minRows: 12, maxRows: 50 }"
+        <label class="label" for="timezone-output">Result:</label>
+        <textarea
+          id="timezone-output"
+          :value="outputValue"
+          rows="12"
           readonly
-        />
+        ></textarea>
       </div>
     </div>
   </div>
@@ -176,7 +175,7 @@ onBeforeUnmount(() => {
 
 .timezone-hint {
   margin-bottom: 12px;
-  color: var(--el-text-color-secondary);
+  color: #6b7280;
   font-size: 13px;
   text-align: center;
 }
@@ -188,7 +187,19 @@ onBeforeUnmount(() => {
 }
 
 .label {
+  display: block;
   margin-bottom: 8px;
+}
+
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
 }
 
 @media (max-width: 768px) {
