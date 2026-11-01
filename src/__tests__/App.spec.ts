@@ -15,7 +15,8 @@ describe('App', () => {
     expect(wrapper.text()).toContain('TTO Tools')
     expect(wrapper.find('.site-nav').text()).toContain('日历')
     expect(wrapper.find('.site-nav').text()).toContain('时间戳转换')
-    expect(wrapper.findAll('.tool-card')).toHaveLength(2)
+    expect(wrapper.find('.site-nav').text()).toContain('待办事项')
+    expect(wrapper.findAll('.tool-card')).toHaveLength(3)
   })
 
   it('shows a 404 page for unmatched paths and can return home', async () => {

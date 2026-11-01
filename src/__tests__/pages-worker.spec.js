@@ -10,6 +10,7 @@ describe('Pages SPA response status', () => {
     '/', '/calendar', '/CALENDAR/', '/timezone', '/timezone/',
     '/timezone/utc', '/TIMEZONE/UTC/', '/timezone/utc+8', '/TIMEZONE/UTC-8/', '/timezone/utc+99',
     '/timezone/utf-8', '/timezone/utc8', '/timezone/utc+100',
+    '/todo', '/TODO/', '/todo/extra',
     '/calendar/extra', '/unknown', '/assets/missing.js',
   ])('matches the client router for %s', async (path) => {
     const response = await worker.fetch(new Request(`https://example.com${path}`), env)

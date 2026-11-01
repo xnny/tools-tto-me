@@ -28,4 +28,12 @@ export const tools: ToolItem[] = [
     icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l2.5 2.5',
     color: '#3b82f6',
   },
+  {
+    name: 'Todo',
+    path: '/todo',
+    title: '待办事项',
+    description: '本地保存待办，支持批量添加、多行内容与完成状态管理。',
+    icon: 'M9 5h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2m2-2h6v4H9V3Zm-1 11 3 3 5-6',
+    color: '#16a085',
+  },
 ]

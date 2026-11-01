@@ -5,5 +5,9 @@ import { test, expect } from '@playwright/test'
 test('visits the app root url', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('h1')).toHaveText('简单好用的在线小工具')
-  await expect(page.locator('.tool-card')).toHaveCount(2)
+  await expect(page.locator('.tool-card')).toHaveCount(3)
+  await expect(page.locator('.tool-card').filter({ hasText: '待办事项' })).toHaveAttribute(
+    'href',
+    '/todo',
+  )
 })
