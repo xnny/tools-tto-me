@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
+import {
+  getRecentTimezones,
+  removeRecentTimezone,
+  saveRecentTimezone,
+  type RecentTimezone,
+} from '@/utils/timezoneHistory';
 
 const route = useRoute();
 const inputValue = ref('');
 const nowSeconds = ref(Math.floor(Date.now() / 1000));
+const recentTimezones = ref<RecentTimezone[]>([]);
+const historyLoading = ref(true);
+const historyError = ref('');
+let historyUpdates = Promise.resolve();
 let timer: number | undefined;
 
 const resolveOffsetHours = (zone?: string) => {
@@ -20,14 +30,47 @@ const resolveOffsetHours = (zone?: string) => {
 };
 
 const offsetHours = computed(() => resolveOffsetHours(route.params.zone as string | undefined));
-const timezoneLabel = computed(() => {
-  const hours = offsetHours.value;
+const formatTimezoneLabel = (hours: number) => {
   if (hours === 0) {
     return 'UTC';
   }
   const sign = hours > 0 ? '+' : '-';
   return `UTC${sign}${Math.abs(hours)}`;
-});
+};
+const timezoneLabel = computed(() => formatTimezoneLabel(offsetHours.value));
+
+const updateHistory = (action: () => Promise<void>, errorMessage: string) => {
+  // Keep saves and deletions in order when the user switches time zones quickly.
+  historyUpdates = historyUpdates
+    .then(async () => {
+      await action();
+      recentTimezones.value = await getRecentTimezones();
+      historyError.value = '';
+    })
+    .catch(() => {
+      historyError.value = errorMessage;
+    })
+    .finally(() => {
+      historyLoading.value = false;
+    });
+};
+
+watch(
+  offsetHours,
+  (offset) => {
+    if (route.name === 'TimezoneConverter') {
+      updateHistory(
+        () => saveRecentTimezone(offset),
+        '最近使用的时区暂时无法保存，请稍后再试。',
+      );
+    }
+  },
+  { immediate: true },
+);
+
+const deleteTimezone = (offset: number) => {
+  updateHistory(() => removeRecentTimezone(offset), '时区记录删除失败，请重试。');
+};
 
 const parseTimestampInZone = (value: string, offset: number) => {
   const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
@@ -150,6 +193,42 @@ onBeforeUnmount(() => {
         <label class="pane-label" for="timezone-output">结果</label>
         <textarea id="timezone-output" :value="outputValue" rows="12" readonly></textarea>
       </div>
+    </section>
+
+    <section class="recent-timezones" aria-labelledby="recent-timezones-heading">
+      <h2 id="recent-timezones-heading">最近使用的时区</h2>
+      <p v-if="historyError" class="history-error" role="alert">{{ historyError }}</p>
+      <p v-if="historyLoading" class="history-message" role="status">正在加载时区记录…</p>
+      <ul v-else-if="recentTimezones.length" class="recent-timezones-list">
+        <li
+          v-for="timezone in recentTimezones"
+          :key="timezone.offsetHours"
+          class="recent-timezone-card"
+          :class="{ 'is-current': timezone.offsetHours === offsetHours }"
+        >
+          <RouterLink
+            :to="{
+              name: 'TimezoneConverter',
+              params: { zone: formatTimezoneLabel(timezone.offsetHours).toLowerCase() },
+            }"
+            class="recent-timezone-link"
+          >
+            <span class="recent-timezone-label">{{ formatTimezoneLabel(timezone.offsetHours) }}</span>
+            <span class="recent-timezone-time">{{
+              formatTimeInZone(nowSeconds, timezone.offsetHours)
+            }}</span>
+          </RouterLink>
+          <button
+            type="button"
+            class="recent-timezone-delete"
+            :aria-label="`删除 ${formatTimezoneLabel(timezone.offsetHours)} 时区记录`"
+            @click="deleteTimezone(timezone.offsetHours)"
+          >
+            删除
+          </button>
+        </li>
+      </ul>
+      <p v-else-if="!historyError" class="history-message">暂无最近使用的时区。</p>
     </section>
   </main>
 </template>
@@ -278,6 +357,93 @@ textarea:focus {
 textarea[readonly] {
   color: #2c4a75;
   background: #fbfdff;
+}
+
+.recent-timezones {
+  margin-top: 32px;
+}
+
+.recent-timezones h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.recent-timezones-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-timezone-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s;
+}
+
+.recent-timezone-card:hover,
+.recent-timezone-card.is-current {
+  border-color: #9fc1f0;
+}
+
+.recent-timezone-card.is-current {
+  background: var(--color-primary-soft);
+}
+
+.recent-timezone-link {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: var(--radius);
+}
+
+.recent-timezone-label {
+  padding-right: 48px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.recent-timezone-time {
+  color: var(--color-text-soft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-timezone-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 5px 8px;
+  color: var(--color-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.recent-timezone-delete:hover {
+  color: #b42318;
+  background: #fff0ee;
+}
+
+.history-message,
+.history-error {
+  margin: 12px 0;
+  color: var(--color-text-soft);
+  font-size: 14px;
+}
+
+.history-error {
+  color: #b42318;
 }
 
 @media (max-width: 700px) {
