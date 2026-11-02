@@ -428,8 +428,6 @@ textarea[readonly] {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
   transition:
     opacity 0.15s,
     visibility 0.15s,
@@ -437,10 +435,17 @@ textarea[readonly] {
     background-color 0.15s;
 }
 
-.recent-timezone-card:hover .recent-timezone-delete,
-.recent-timezone-delete:focus-visible {
-  opacity: 1;
-  visibility: visible;
+@media (hover: hover) {
+  .recent-timezone-delete {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .recent-timezone-card:hover .recent-timezone-delete,
+  .recent-timezone-delete:focus-visible {
+    opacity: 1;
+    visibility: visible;
+  }
 }
 
 .recent-timezone-delete:hover {
