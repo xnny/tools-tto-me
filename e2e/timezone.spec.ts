@@ -39,7 +39,11 @@ test('deletes individual records without navigating and keeps them deleted on la
   await expect(labels).toHaveText(['UTC-5', 'UTC+8'])
   await page.getByLabel('输入', { exact: true }).fill('0')
 
-  await page.getByRole('button', { name: '删除 UTC-5 时区记录', exact: true }).click()
+  const deleteUtcMinus5 = page.locator('button[aria-label="删除 UTC-5 时区记录"]')
+  await expect(deleteUtcMinus5).toBeHidden()
+  await page.locator('.recent-timezone-card', { hasText: 'UTC-5' }).hover()
+  await expect(deleteUtcMinus5).toBeVisible()
+  await deleteUtcMinus5.click()
   await expect(labels).toHaveText(['UTC+8'])
   await expect(page).toHaveURL(/\/timezone\/utc-5$/)
   await expect(page.getByLabel('结果', { exact: true })).toHaveValue('1969-12-31 19:00:00')
@@ -51,11 +55,13 @@ test('deletes individual records without navigating and keeps them deleted on la
   await page.reload()
   await expect(labels).toHaveText(['UTC', 'UTC+8'])
 
+  await page.locator('.recent-timezone-card', { hasText: 'UTC+8' }).hover()
   await page.getByRole('button', { name: '删除 UTC+8 时区记录', exact: true }).click()
   await expect(labels).toHaveText(['UTC'])
   await page.reload()
   await expect(labels).toHaveText(['UTC'])
 
+  await page.locator('.recent-timezone-card', { hasText: 'UTC' }).hover()
   await page.getByRole('button', { name: '删除 UTC 时区记录', exact: true }).click()
   await expect(labels).toHaveCount(0)
   await expect(page.getByText('暂无最近使用的时区。')).toBeVisible()
