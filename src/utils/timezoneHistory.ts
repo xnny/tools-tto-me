@@ -37,7 +37,7 @@ const getDatabase = () => {
 export const getRecentTimezones = async (): Promise<RecentTimezone[]> => {
   const database = await getDatabase()
   const timezones = await database.getAll('recent-timezones')
-  return timezones.sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+  return timezones.sort((a, b) => a.offsetHours - b.offsetHours)
 }
 
 export const saveRecentTimezone = async (offsetHours: number): Promise<void> => {

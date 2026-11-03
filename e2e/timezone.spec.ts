@@ -9,23 +9,23 @@ test('persists recent time zones, removes duplicates, and reuses them without cl
   await expect(labels).toHaveText(['UTC'])
 
   await page.goto('/timezone/utc+8')
-  await expect(labels).toHaveText(['UTC+8', 'UTC'])
+  await expect(labels).toHaveText(['UTC', 'UTC+8'])
 
   await page.goto('/timezone/utc-5')
-  await expect(labels).toHaveText(['UTC-5', 'UTC+8', 'UTC'])
+  await expect(labels).toHaveText(['UTC-5', 'UTC', 'UTC+8'])
   await page.getByLabel('输入', { exact: true }).fill('0')
 
   await page.getByRole('link', { name: /^UTC\+8 / }).click()
   await expect(page).toHaveURL(/\/timezone\/utc\+8$/)
-  await expect(labels).toHaveText(['UTC+8', 'UTC-5', 'UTC'])
+  await expect(labels).toHaveText(['UTC-5', 'UTC', 'UTC+8'])
   await expect(page.getByLabel('输入', { exact: true })).toHaveValue('0')
   await expect(page.getByLabel('结果', { exact: true })).toHaveValue('1970-01-01 08:00:00')
 
   await page.reload()
-  await expect(labels).toHaveText(['UTC+8', 'UTC-5', 'UTC'])
+  await expect(labels).toHaveText(['UTC-5', 'UTC', 'UTC+8'])
 
   await page.goto('/timezone/utc+08')
-  await expect(labels).toHaveText(['UTC+8', 'UTC-5', 'UTC'])
+  await expect(labels).toHaveText(['UTC-5', 'UTC', 'UTC+8'])
 })
 
 test('deletes individual records without navigating and keeps them deleted on later visits', async ({
