@@ -115,26 +115,49 @@ describe('my todos page', () => {
       id,
     }))
     const wrapper = await renderTodos()
-    const retention = wrapper.findAll('.retention-option input')[1]!
-    await retention.setValue(true)
+    expect(wrapper.find('.retention-option').exists()).toBe(false)
+    await wrapper.get('#todo-edit-2').trigger('click')
+    await wrapper.get('.todo-editor .retention-option input').setValue(true)
+    expect(updateTodo).not.toHaveBeenCalled()
+    await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
-    expect(updateTodo).toHaveBeenLastCalledWith(2, { autoDelete: false })
+    expect(updateTodo).toHaveBeenLastCalledWith(2, {
+      content: secondTodo.content,
+      autoDelete: false,
+    })
+    expect(wrapper.find('.retention-option').exists()).toBe(false)
     expect(wrapper.get<HTMLInputElement>('#todo-complete-2').element.checked).toBe(true)
-    await retention.setValue(false)
+    await wrapper.get('#todo-edit-2').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(true)
+    await wrapper.get('.retention-option input').setValue(false)
+    await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
-    expect(updateTodo).toHaveBeenLastCalledWith(2, { autoDelete: true })
+    expect(updateTodo).toHaveBeenLastCalledWith(2, {
+      content: secondTodo.content,
+      autoDelete: true,
+    })
     expect(clearExpiredTodos).toHaveBeenCalledTimes(1)
     expect(wrapper.findAll('.todo-item')).toHaveLength(2)
   })
 
-  it('keeps the retention checkbox unchanged if saving fails', async () => {
+  it('keeps the retention draft if saving fails and discards it on cancel', async () => {
     vi.mocked(updateTodo).mockRejectedValueOnce(new Error('Storage unavailable'))
     const wrapper = await renderTodos()
+    await wrapper.get('#todo-edit-1').trigger('click')
     const retention = wrapper.get<HTMLInputElement>('.retention-option input')
     await retention.setValue(true)
+    await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
-    expect(retention.element.checked).toBe(false)
-    expect(wrapper.get('[role="alert"]').text()).toContain('自动删除设置保存失败')
+    expect(retention.element.checked).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('编辑内容已保留')
+    await wrapper.get('.todo-editor button[type="button"]').trigger('click')
+    expect(wrapper.find('.retention-option').exists()).toBe(false)
+    await wrapper.get('#todo-edit-1').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(false)
+    expect(updateTodo).toHaveBeenCalledExactlyOnceWith(1, {
+      content: firstTodo.content,
+      autoDelete: false,
+    })
   })
 
   it('saves multiline edits without changing creation or completion timestamps', async () => {
@@ -145,7 +168,7 @@ describe('my todos page', () => {
     await wrapper.get('#todo-edit-input').setValue(content)
     await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
-    expect(updateTodo).toHaveBeenCalledExactlyOnceWith(2, { content })
+    expect(updateTodo).toHaveBeenCalledExactlyOnceWith(2, { content, autoDelete: true })
     expect(wrapper.findAll('.todo-content')[1]!.text()).toBe(content)
     expect(wrapper.get<HTMLInputElement>('#todo-complete-2').element.checked).toBe(true)
     expect(wrapper.get('.todo-group h3').text()).toBe('2026-11-03')

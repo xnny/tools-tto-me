@@ -18,6 +18,7 @@ const loadError = ref('')
 const operationError = ref('')
 const editingId = ref(0)
 const editValue = ref('')
+const editRetention = ref(false)
 const busy = computed(() => loading.value || saving.value)
 const activeCount = computed(() => todos.value.filter((todo) => todo.completedAt === 0).length)
 const todoGroups = computed(() => {
@@ -88,14 +89,6 @@ const toggleTodo = async (todo: Todo, event: Event) => {
   }, '完成状态保存失败，请重试。')
 }
 
-const toggleRetention = async (todo: Todo, event: Event) => {
-  const checkbox = event.target as HTMLInputElement
-  checkbox.checked = !todo.autoDelete
-  await mutateTodo(async () => {
-    replaceTodo(await updateTodo(todo.id, { autoDelete: !todo.autoDelete }))
-  }, '自动删除设置保存失败，请重试。')
-}
-
 const deleteTodo = async (todo: Todo) => {
   await mutateTodo(async () => {
     await removeTodo(todo.id)
@@ -106,6 +99,7 @@ const deleteTodo = async (todo: Todo) => {
 const startEditing = async (todo: Todo) => {
   editingId.value = todo.id
   editValue.value = todo.content
+  editRetention.value = !todo.autoDelete
   operationError.value = ''
   await nextTick()
   document.getElementById('todo-edit-input')?.focus()
@@ -115,6 +109,7 @@ const finishEditing = async () => {
   const id = editingId.value
   editingId.value = 0
   editValue.value = ''
+  editRetention.value = false
   operationError.value = ''
   await nextTick()
   document.getElementById(`todo-edit-${id}`)?.focus()
@@ -127,7 +122,9 @@ const saveEdit = async (todo: Todo) => {
   }
 
   const saved = await mutateTodo(async () => {
-    replaceTodo(await updateTodo(todo.id, { content: editValue.value }))
+    replaceTodo(
+      await updateTodo(todo.id, { content: editValue.value, autoDelete: !editRetention.value }),
+    )
   }, '待办修改保存失败，编辑内容已保留，请重试。')
   if (saved) await finishEditing()
 }
@@ -212,6 +209,15 @@ onMounted(loadTodos)
                     rows="5"
                     :disabled="saving"
                   ></textarea>
+                  <label class="retention-option">
+                    <input
+                      v-model="editRetention"
+                      type="checkbox"
+                      :disabled="saving"
+                      :aria-label="`不自动删除：${todo.content}`"
+                    />
+                    不自动删除
+                  </label>
                   <div class="edit-actions">
                     <button
                       type="submit"
@@ -230,16 +236,6 @@ onMounted(loadTodos)
                     todo.content
                   }}</label>
                   <div class="todo-actions">
-                    <label class="retention-option">
-                      <input
-                        type="checkbox"
-                        :checked="!todo.autoDelete"
-                        :disabled="busy || editingId !== 0"
-                        :aria-label="`不自动删除：${todo.content}`"
-                        @change="toggleRetention(todo, $event)"
-                      />
-                      不自动删除
-                    </label>
                     <button
                       :id="`todo-edit-${todo.id}`"
                       type="button"

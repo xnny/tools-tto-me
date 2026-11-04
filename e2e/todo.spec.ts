@@ -131,7 +131,7 @@ const readStoredTodos = (page: Page): Promise<Todo[]> =>
   page.evaluate(
     () =>
       new Promise((resolve, reject) => {
-        const request = indexedDB.open('tto-tools-todos', 1)
+        const request = indexedDB.open('tto-todos', 1)
         request.onerror = () => reject(request.error)
         request.onsuccess = () => {
           const database = request.result
@@ -153,7 +153,7 @@ const seedTodos = (page: Page, todos: Todo[]) =>
   page.evaluate(
     (records) =>
       new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open('tto-tools-todos', 1)
+        const request = indexedDB.open('tto-todos', 1)
         request.onerror = () => reject(request.error)
         request.onsuccess = () => {
           const database = request.result
@@ -252,16 +252,19 @@ test.describe('date groups and expiration', () => {
       '永久保留',
     ])
     expect((await readStoredTodos(page)).map((record) => record.id)).toEqual([1, 2, 5, 6, 7])
-    await expect(
-      page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
-    ).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: /^不自动删除：/ })).toHaveCount(0)
     await page.getByRole('button', { name: '已完成', exact: true }).click()
     await expect(page.locator('.todo-group h3')).toHaveText(['2026-11-03'])
 
+    await page.getByRole('button', { name: '编辑待办：永久保留', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
+    ).toBeChecked()
     await page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }).click()
     await expect(
       page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
     ).not.toBeChecked()
+    await page.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(page.locator('.todo-content')).toHaveText(['尚差一毫秒', '永久保留'])
     await page.getByRole('link', { name: '新增待办', exact: true }).click()
     await expect(page.getByRole('button', { name: '添加待办', exact: true })).toBeDisabled()
@@ -300,10 +303,27 @@ test.describe('date groups and expiration', () => {
     await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
     await seedTodos(page, [todo(1, '保留此条'), todo(2, '重新完成')])
     await page.reload()
+    await expect(page.getByRole('checkbox', { name: /^不自动删除：/ })).toHaveCount(0)
+    await page.getByRole('button', { name: '编辑待办：保留此条', exact: true }).click()
     await page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }).click()
     await expect(
       page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
     ).toBeChecked()
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    expect((await readStoredTodos(page))[0]?.autoDelete).toBe(true)
+    await page.getByRole('button', { name: '编辑待办：保留此条', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
+    ).not.toBeChecked()
+    await page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }).click()
+    await page.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(page.getByRole('checkbox', { name: /^不自动删除：/ })).toHaveCount(0)
+    await page.reload()
+    await page.getByRole('button', { name: '编辑待办：保留此条', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
+    ).toBeChecked()
+    await page.getByRole('button', { name: '取消', exact: true }).click()
     await page.getByRole('checkbox', { name: '完成待办：保留此条', exact: true }).click()
     await expect(
       page.getByRole('checkbox', { name: '恢复待办：保留此条', exact: true }),
