@@ -90,6 +90,19 @@ const submitTodos = async () => {
   }
 }
 
+const handleKeydown = (event: KeyboardEvent) => {
+  if (
+    event.key === 'Enter' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !event.isComposing
+  ) {
+    event.preventDefault()
+    void submitTodos()
+  }
+}
+
 const saveHiddenDraft = () => {
   if (document.visibilityState === 'hidden') saveDraft()
 }
@@ -134,7 +147,8 @@ onBeforeUnmount(() => {
     <form class="composer card" aria-label="添加待办" @submit.prevent="submitTodos">
       <label for="todo-input" class="section-title">新增待办</label>
       <p id="todo-input-help" class="input-help">
-        一行一条；用一对 <code>```</code> 包住正文，可添加一条多行待办。
+        一行一条；用一对 <code>```</code> 包住正文，可添加一条多行待办。按
+        <code>Command + Return</code>（Win/Linux 按 <code>Ctrl + Enter</code>）可快速提交。
       </p>
       <textarea
         id="todo-input"
@@ -145,6 +159,7 @@ onBeforeUnmount(() => {
         :aria-invalid="Boolean(addError)"
         :aria-describedby="addError ? 'todo-input-help todo-add-error' : 'todo-input-help'"
         @input="handleInput"
+        @keydown="handleKeydown"
       ></textarea>
       <p class="draft-status" role="status">{{ draftStatus }}</p>
       <p v-if="draftError" class="error-message" role="alert">{{ draftError }}</p>

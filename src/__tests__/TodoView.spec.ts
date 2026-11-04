@@ -200,4 +200,29 @@ describe('todo composer', () => {
     expect(wrapper.get<HTMLTextAreaElement>('#todo-input').element.value).toBe('')
     expect(addTodos).toHaveBeenCalledTimes(1)
   })
+
+  it('submits todos with Command+Return or Ctrl+Enter in the textarea', async () => {
+    const wrapper = await renderComposer()
+    const input = wrapper.get('#todo-input')
+
+    await input.setValue('快捷键待办 1')
+    await input.trigger('keydown', { key: 'Enter' })
+    await input.trigger('keydown', { key: 'Enter', shiftKey: true })
+    await input.trigger('keydown', { key: 'Enter', altKey: true })
+    await input.trigger('keydown', { key: 'Enter', metaKey: true, shiftKey: true })
+    await input.trigger('keydown', { key: 'Enter', ctrlKey: true, isComposing: true })
+    expect(addTodos).not.toHaveBeenCalled()
+
+    await input.trigger('keydown', { key: 'Enter', metaKey: true })
+    await flushPromises()
+    expect(addTodos).toHaveBeenCalledExactlyOnceWith(['快捷键待办 1'])
+    expect(wrapper.get<HTMLTextAreaElement>('#todo-input').element.value).toBe('')
+
+    await input.setValue('快捷键待办 2')
+    await input.trigger('keydown', { key: 'Enter', ctrlKey: true })
+    await flushPromises()
+    expect(addTodos).toHaveBeenCalledTimes(2)
+    expect(addTodos).toHaveBeenLastCalledWith(['快捷键待办 2'])
+    expect(wrapper.get<HTMLTextAreaElement>('#todo-input').element.value).toBe('')
+  })
 })
