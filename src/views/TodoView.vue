@@ -118,7 +118,6 @@ onBeforeUnmount(() => {
     <header class="page-heading">
       <p class="eyebrow">TODO</p>
       <h1>待办事项</h1>
-      <p class="subtitle">记录要做的事。停止输入 1 秒后自动保存草稿，点击添加后成为正式待办。</p>
       <nav class="todo-nav" aria-label="待办导航">
         <RouterLink to="/todo">新增待办</RouterLink>
         <RouterLink to="/todo/list">我的待办</RouterLink>
@@ -164,6 +163,8 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </form>
+
+    <p class="footnote">记录要做的事。停止输入 1 秒后自动保存草稿，点击添加后成为正式待办。</p>
   </main>
 </template>
 

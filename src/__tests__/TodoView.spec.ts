@@ -53,6 +53,8 @@ describe('todo composer', () => {
     expect(wrapper.get('.draft-status').text()).toContain('草稿已保存')
     expect(addTodos).not.toHaveBeenCalled()
     expect(wrapper.find('.todo-list-section').exists()).toBe(false)
+    expect(wrapper.find('.page-heading .subtitle').exists()).toBe(false)
+    expect(wrapper.get('.todo-page > :last-child').classes()).toContain('footnote')
   })
 
   it('restores a draft and removes it when the input is cleared', async () => {

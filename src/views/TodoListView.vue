@@ -140,7 +140,6 @@ onMounted(loadTodos)
     <header class="page-heading">
       <p class="eyebrow">TODO</p>
       <h1>我的待办</h1>
-      <p class="subtitle">完成满 7 天后，在下次打开或刷新页面时自动删除，也可逐条设置保留。</p>
       <nav class="todo-nav" aria-label="待办导航">
         <RouterLink to="/todo">新增待办</RouterLink>
         <RouterLink to="/todo/list">我的待办</RouterLink>
@@ -269,6 +268,8 @@ onMounted(loadTodos)
         <p v-else class="empty-state card">{{ emptyMessage }}</p>
       </template>
     </section>
+
+    <p class="footnote">完成满 7 天后，在下次打开或刷新页面时自动删除，也可逐条设置保留。</p>
   </main>
 </template>
 

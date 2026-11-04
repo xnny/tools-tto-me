@@ -70,6 +70,8 @@ describe('my todos page', () => {
     await wrapper.get('.filters button:nth-child(1)').trigger('click')
     expect(content()).toEqual(['今天新增', '买牛奶', '回复邮件'])
     expect(wrapper.find('.composer').exists()).toBe(false)
+    expect(wrapper.find('.page-heading .subtitle').exists()).toBe(false)
+    expect(wrapper.get('.todo-page > :last-child').classes()).toContain('footnote')
   })
 
   it('records completion time, resets it to zero on restore, and starts a new period on completion', async () => {
