@@ -158,13 +158,14 @@ h1 { margin: 0; color: #1f2d41; font-size: 32px; line-height: 1.2; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 19px 22px; border-bottom: 1px solid #edf1f6; }
 .date-controls, .month-control { display: flex; align-items: center; gap: 10px; }
 .month-control { gap: 2px; }
+.select-wrap { display: inline-flex; align-items: center; }
 select, button { font: inherit; }
-select { height: 36px; min-width: 100px; padding: 0 30px 0 12px; color: #425167; background: #fff; border: 1px solid #dce4ed; border-radius: 5px; cursor: pointer; }
+select { appearance: none; height: 36px; min-width: 100px; padding: 0 30px 0 12px; color: #425167; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%238b9aab' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 4.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E") no-repeat right 10px center; border: 1px solid #dce4ed; border-radius: 5px; cursor: pointer; }
 .month-select select { min-width: 75px; }
-.arrow { width: 28px; height: 36px; padding: 0; border: 0; background: transparent; color: #8b9aab; font-size: 26px; cursor: pointer; }
+.arrow { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 36px; padding: 0 0 2px; border: 0; background: transparent; color: #8b9aab; font-size: 26px; line-height: 1; cursor: pointer; }
 .arrow:hover { color: #3281df; }
 .arrow:disabled { opacity: .3; cursor: default; }
-.today-button { height: 36px; padding: 0 16px; color: #377ed2; background: #f1f7ff; border: 1px solid #d7e9ff; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.today-button { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; color: #377ed2; background: #f1f7ff; border: 1px solid #d7e9ff; border-radius: 5px; cursor: pointer; white-space: nowrap; }
 .today-button:hover { background: #e4f1ff; }
 .calendar-content { display: grid; grid-template-columns: minmax(0, 1fr) 245px; }
 .month-view { padding: 14px 22px 22px; }
