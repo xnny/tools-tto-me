@@ -19,7 +19,7 @@ let databasePromise: Promise<IDBPDatabase<TodoDatabase>> | undefined
 
 const getDatabase = async (): Promise<IDBPDatabase<TodoDatabase>> => {
   if (!databasePromise) {
-    const opening = openDB<TodoDatabase>('tto-tools-todos', 1, {
+    const opening = openDB<TodoDatabase>('tto-todos', 1, {
       upgrade(database) {
         database.createObjectStore('todos', { keyPath: 'id', autoIncrement: true })
       },

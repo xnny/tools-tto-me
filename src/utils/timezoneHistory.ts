@@ -15,7 +15,7 @@ interface TimezoneHistoryDB extends DBSchema {
 let databasePromise: Promise<IDBPDatabase<TimezoneHistoryDB>> | undefined
 
 const getDatabase = () => {
-  databasePromise ??= openDB<TimezoneHistoryDB>('tto-tools', 1, {
+  databasePromise ??= openDB<TimezoneHistoryDB>('tto-timezone', 1, {
     upgrade(database) {
       database.createObjectStore('recent-timezones', { keyPath: 'offsetHours' })
     },
