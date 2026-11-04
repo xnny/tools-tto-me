@@ -1,21 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { dateKey, getCalendarDay, getCalendarMonth } from '@/utils/calendar'
 
-const today = ref(new Date())
-const selectedDate = ref(new Date(today.value.getFullYear(), today.value.getMonth(), today.value.getDate()))
-const year = ref(today.value.getFullYear())
-const month = ref(today.value.getMonth() + 1)
+const today = shallowRef(Temporal.Now.zonedDateTimeISO().toPlainDate())
+const selectedDate = shallowRef(today.value)
+const year = ref(today.value.year)
+const month = ref(today.value.month)
 const holiday = ref('')
-const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+const weekdays = ['一', '二', '三', '四', '五', '六', '日']
 const years = Array.from({ length: 199 }, (_, index) => 1901 + index)
 const months = Array.from({ length: 12 }, (_, index) => index + 1)
 const days = computed(() => getCalendarMonth(year.value, month.value))
 const selected = computed(() => getCalendarDay(selectedDate.value))
 const todayKey = computed(() => dateKey(today.value))
 const relativeDays = computed(() => {
-  const calendarTime = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-  const difference = (calendarTime(selectedDate.value) - calendarTime(today.value)) / 86400000
+  const difference = today.value.until(selectedDate.value, { largestUnit: 'days' }).days
   if (difference > 0) return `还有${difference}天`
   if (difference < 0) return `已经过去${-difference}天`
   return ''
@@ -24,31 +23,30 @@ const relativeDays = computed(() => {
 let midnightTimer: ReturnType<typeof setTimeout> | undefined
 
 function updateToday() {
-  today.value = new Date()
-  const nextMidnight = new Date(today.value.getFullYear(), today.value.getMonth(), today.value.getDate() + 1)
-  midnightTimer = setTimeout(updateToday, nextMidnight.getTime() - today.value.getTime())
+  const now = Temporal.Now.zonedDateTimeISO()
+  today.value = now.toPlainDate()
+  const nextMidnight = now.add({ days: 1 }).startOfDay()
+  midnightTimer = setTimeout(updateToday, nextMidnight.epochMilliseconds - now.epochMilliseconds)
 }
 
 onMounted(updateToday)
 onUnmounted(() => clearTimeout(midnightTimer))
 
-function selectDate(date: Date) {
-  selectedDate.value = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  year.value = date.getFullYear()
-  month.value = date.getMonth() + 1
+function selectDate(date: Temporal.PlainDate) {
+  selectedDate.value = date
+  year.value = date.year
+  month.value = date.month
   holiday.value = ''
 }
 
 function changeMonth(amount: number) {
-  const target = new Date(year.value, month.value - 1 + amount, 1)
-  if (target.getFullYear() < 1901 || target.getFullYear() > 2099) return
-  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
-  selectDate(new Date(target.getFullYear(), target.getMonth(), Math.min(selectedDate.value.getDate(), lastDay)))
+  const target = selectedDate.value.add({ months: amount }, { overflow: 'constrain' })
+  if (target.year < 1901 || target.year > 2099) return
+  selectDate(target)
 }
 
 function changeSelection() {
-  const lastDay = new Date(year.value, month.value, 0).getDate()
-  selectDate(new Date(year.value, month.value - 1, Math.min(selectedDate.value.getDate(), lastDay)))
+  selectDate(selectedDate.value.with({ year: year.value, month: month.value }, { overflow: 'constrain' }))
 }
 
 function selectHoliday() {
@@ -73,7 +71,7 @@ function selectHoliday() {
         <h1>日历</h1>
         <p class="subtitle">查看日期、农历与节日</p>
       </div>
-      <span class="heading-date">{{ today.getFullYear() }} 年 {{ today.getMonth() + 1 }} 月</span>
+      <span class="heading-date">{{ today.year }} 年 {{ today.month }} 月</span>
     </div>
 
     <section class="calendar-card" aria-label="日历">
@@ -109,7 +107,7 @@ function selectHoliday() {
       <div class="calendar-content">
         <div class="month-view">
           <div class="weekdays" aria-hidden="true">
-            <span v-for="(weekday, index) in weekdays" :key="weekday" :class="{ weekend: index === 0 || index === 6 }">{{ weekday }}</span>
+            <span v-for="(weekday, index) in weekdays" :key="weekday" :class="{ weekend: index === 5 || index === 6 }">{{ weekday }}</span>
           </div>
           <div class="day-grid">
             <button
@@ -120,7 +118,7 @@ function selectHoliday() {
               :class="{ outside: !day.inMonth, selected: day.key === selected.key, today: day.key === todayKey, festival: day.festivals.length || day.solarTerm }"
               :aria-label="`${day.key} ${day.lunarDate}${day.festivals.length ? ' ' + day.festivals.join('、') : ''}`"
               :aria-pressed="day.key === selected.key"
-              :disabled="day.date.getFullYear() < 1901 || day.date.getFullYear() > 2099"
+              :disabled="day.date.year < 1901 || day.date.year > 2099"
               @click="selectDate(day.date)"
             >
               <span v-if="day.holiday" class="holiday-badge" :class="{ work: day.holiday === '班' }">{{ day.holiday }}</span>
@@ -132,7 +130,7 @@ function selectHoliday() {
         </div>
 
         <aside class="day-detail" aria-live="polite">
-          <p class="detail-date">{{ selected.date.getFullYear() }}年{{ selected.date.getMonth() + 1 }}月{{ selected.day }}日 星期{{ weekdays[selected.date.getDay()] }}</p>
+          <p class="detail-date">{{ selected.date.year }}年{{ selected.date.month }}月{{ selected.day }}日 星期{{ weekdays[selected.date.dayOfWeek - 1] }}</p>
           <div class="detail-number">{{ selected.day }}</div>
           <p v-if="relativeDays" class="detail-relative">{{ relativeDays }}</p>
           <p class="detail-lunar">农历{{ selected.lunarDate }}</p>

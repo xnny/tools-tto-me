@@ -1,7 +1,7 @@
-import { HolidayUtil, Solar } from 'lunar-javascript'
+import { HolidayUtil, Solar } from 'lunar-typescript'
 
 export interface CalendarDay {
-  date: Date
+  date: Temporal.PlainDate
   key: string
   day: number
   inMonth: boolean
@@ -19,19 +19,14 @@ export interface CalendarDay {
   ji: string[]
 }
 
-/** The key uses local calendar components, rather than UTC conversion. */
-export function dateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+/** ISO date key, independent of time zones. */
+export function dateKey(date: Temporal.PlainDate): string {
+  return date.toString()
 }
 
-/** Convert one local Gregorian date into the information shown on the calendar. */
-export function getCalendarDay(date: Date): CalendarDay {
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  const day = date.getDate()
+/** Convert one Gregorian date into the information shown on the calendar. */
+export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
+  const { year, month, day } = date
   const solar = Solar.fromYmd(year, month, day)
   const lunar = solar.getLunar()
   const lunarMonth = `${lunar.getMonthInChinese()}月`
@@ -41,7 +36,7 @@ export function getCalendarDay(date: Date): CalendarDay {
   const holiday = HolidayUtil.getHoliday(year, month, day)
 
   return {
-    date: new Date(year, month - 1, day),
+    date,
     key: dateKey(date),
     day,
     inMonth: true,
@@ -60,14 +55,15 @@ export function getCalendarDay(date: Date): CalendarDay {
   }
 }
 
-/** Return a Sunday-first six-week grid. Month is one-based. */
+/** Return a Monday-first six-week grid. Month is one-based. */
 export function getCalendarMonth(year: number, month: number): CalendarDay[] {
-  const first = new Date(year, month - 1, 1)
-  const start = new Date(year, month - 1, 1 - first.getDay())
+  const first = Temporal.PlainDate.from({ year, month, day: 1 })
+  const start = first.subtract({ days: first.dayOfWeek - 1 })
   return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index)
-    const entry = getCalendarDay(date)
-    entry.inMonth = date.getFullYear() === year && date.getMonth() === month - 1
-    return entry
+    const date = start.add({ days: index })
+    return {
+      ...getCalendarDay(date),
+      inMonth: date.year === year && date.month === month,
+    }
   })
 }
