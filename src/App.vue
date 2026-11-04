@@ -15,7 +15,13 @@ const year = new Date().getFullYear()
           <span class="brand-name">TTO Tools</span>
         </RouterLink>
         <nav class="site-nav" aria-label="工具导航">
-          <RouterLink v-for="tool in tools" :key="tool.name" :to="tool.path" class="nav-link">
+          <RouterLink
+            v-for="tool in tools"
+            :key="tool.name"
+            :to="tool.path"
+            class="nav-link"
+            :class="{ 'router-link-active': tool.name === 'Todo' && $route.name === 'TodoList' }"
+          >
             {{ tool.title }}
           </RouterLink>
         </nav>

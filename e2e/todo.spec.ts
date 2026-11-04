@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+import type { Todo } from '../src/utils/todoStorage'
 
 test('persists batches, multiline content, edits, completion, and deletion across reloads', async ({
   page,
@@ -7,14 +8,18 @@ test('persists batches, multiline content, edits, completion, and deletion acros
   await page.locator('.tool-card').filter({ hasText: '待办事项' }).click()
   await expect(page).toHaveURL(/\/todo$/)
   await expect(page).toHaveTitle('待办事项 · TTO Tools')
-  await expect(page.getByText('还没有待办，从上方添加第一条吧。')).toBeVisible()
+  await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
 
   const input = page.getByLabel('新增待办', { exact: true })
   const contents = page.locator('.todo-content')
   await input.fill('买牛奶\n```\n准备周报\n  整理进展\n\n  下周计划\n```\n回复邮件')
   await page.getByRole('button', { name: '添加待办', exact: true }).click()
-  await expect(contents).toHaveText(['买牛奶', '准备周报\n  整理进展\n\n  下周计划', '回复邮件'])
+  await expect(page.locator('.save-message')).toHaveText('已添加 3 条待办。')
   await expect(input).toHaveValue('')
+  await page.getByRole('link', { name: '查看我的待办 →', exact: true }).click()
+  await expect(page).toHaveURL(/\/todo\/list$/)
+  await expect(page).toHaveTitle('我的待办 · TTO Tools')
+  await expect(contents).toHaveText(['买牛奶', '准备周报\n  整理进展\n\n  下周计划', '回复邮件'])
   await page.reload()
   await expect(contents).toHaveCount(3)
   await expect(contents.nth(1)).toHaveJSProperty(
@@ -61,10 +66,12 @@ test('retains unmatched fences and commits nothing until they are closed', async
   await page.getByRole('button', { name: '添加待办', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('尚未闭合')
   await expect(input).toHaveValue(draft)
-  await expect(page.locator('.todo-item')).toHaveCount(0)
+  expect(await readStoredTodos(page)).toEqual([])
 
   await input.fill(`${draft}\n\`\`\``)
   await page.getByRole('button', { name: '添加待办', exact: true }).click()
+  await expect(page.locator('.save-message')).toHaveText('已添加 2 条待办。')
+  await page.getByRole('link', { name: '我的待办', exact: true }).click()
   await expect(page.locator('.todo-content')).toHaveText(['普通待办', '多行\n内容'])
   await page.reload()
   await expect(page.locator('.todo-item')).toHaveCount(2)
@@ -76,7 +83,7 @@ test('rolls back the entire batch on a database write failure and keeps the draf
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.goto('/todo')
-  await expect(page.getByText('还没有待办，从上方添加第一条吧。')).toBeVisible()
+  await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
   await page.evaluate(() => {
     const originalAdd = IDBObjectStore.prototype.add
     let writes = 0
@@ -94,12 +101,14 @@ test('rolls back the entire batch on a database write failure and keeps the draf
   await page.getByRole('button', { name: '添加待办', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('输入已保留')
   await expect(input).toHaveValue('第一条\n第二条')
-  await expect(page.locator('.todo-item')).toHaveCount(0)
+  expect(await readStoredTodos(page)).toEqual([])
   await page.reload()
-  await expect(page.getByText('还没有待办，从上方添加第一条吧。')).toBeVisible()
+  await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
 
   await input.fill('第一条\n第二条')
   await page.getByRole('button', { name: '添加待办', exact: true }).click()
+  await expect(page.locator('.save-message')).toHaveText('已添加 2 条待办。')
+  await page.getByRole('link', { name: '我的待办', exact: true }).click()
   await expect(page.locator('.todo-content')).toHaveText(['第一条', '第二条'])
   expect(pageErrors).toEqual([])
 })
@@ -110,10 +119,250 @@ test('shows an actionable error when browser storage is unavailable', async ({ p
   })
 
   await page.goto('/todo')
-  await expect(page.getByRole('alert')).toContainText('无法读取本地待办')
+  await expect(page.getByRole('alert')).toContainText('无法读取或清理本地待办')
   await page.getByLabel('新增待办', { exact: true }).fill('待保存的内容')
   await expect(page.getByRole('button', { name: '添加待办', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '重试加载', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('无法读取本地待办')
+  await expect(page.getByRole('alert')).toContainText('无法读取或清理本地待办')
   await expect(page.getByLabel('新增待办', { exact: true })).toHaveValue('待保存的内容')
+})
+
+const readStoredTodos = (page: Page): Promise<Todo[]> =>
+  page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('tto-tools-todos', 1)
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const transaction = database.transaction('todos', 'readonly')
+          const records = transaction.objectStore('todos').getAll()
+          transaction.oncomplete = () => {
+            database.close()
+            resolve(records.result)
+          }
+          transaction.onabort = () => {
+            database.close()
+            reject(transaction.error)
+          }
+        }
+      }),
+  )
+
+const seedTodos = (page: Page, todos: Todo[]) =>
+  page.evaluate(
+    (records) =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('tto-tools-todos', 1)
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const transaction = database.transaction('todos', 'readwrite')
+          records.forEach((record) => transaction.objectStore('todos').put(record))
+          transaction.oncomplete = () => {
+            database.close()
+            resolve()
+          }
+          transaction.onabort = () => {
+            database.close()
+            reject(transaction.error)
+          }
+        }
+      }),
+    todos,
+  )
+
+test('saves drafts after an idle second and restores them across reloads and page navigation', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-11-04T08:00:00Z') })
+  await page.goto('/todo')
+  await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
+  await page.clock.pauseAt(new Date('2026-11-04T09:00:00Z'))
+  const input = page.getByLabel('新增待办', { exact: true })
+  await input.fill('第一行')
+  await page.clock.runFor(999)
+  expect(await page.evaluate(() => localStorage.getItem('tto-tools-todo-draft'))).toBeNull()
+  const draft = '普通待办\n```\n  多行草稿\n第二行\n```'
+  await input.fill(draft)
+  await page.clock.runFor(999)
+  expect(await page.evaluate(() => localStorage.getItem('tto-tools-todo-draft'))).toBeNull()
+  await page.clock.runFor(1)
+  expect(await page.evaluate(() => localStorage.getItem('tto-tools-todo-draft'))).toBe(draft)
+  expect(await readStoredTodos(page)).toEqual([])
+  await page.reload()
+  await expect(input).toHaveValue(draft)
+
+  await input.fill(draft + '\n离开前的输入')
+  await page.getByRole('link', { name: '我的待办', exact: true }).click()
+  await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+  await page.getByRole('link', { name: '新增待办', exact: true }).click()
+  await expect(input).toHaveValue(draft + '\n离开前的输入')
+  await page.getByRole('button', { name: '添加待办', exact: true }).click()
+  await expect(page.locator('.save-message')).toHaveText('已添加 3 条待办。')
+  await page.clock.runFor(1000)
+  expect(await page.evaluate(() => localStorage.getItem('tto-tools-todo-draft'))).toBeNull()
+  await page.reload()
+  await expect(input).toHaveValue('')
+  expect(
+    (await readStoredTodos(page)).map(({ completedAt, autoDelete }) => ({
+      completedAt,
+      autoDelete,
+    })),
+  ).toEqual(Array.from({ length: 3 }, () => ({ completedAt: 0, autoDelete: true })))
+})
+
+test.describe('date groups and expiration', () => {
+  test.use({ timezoneId: 'Asia/Shanghai' })
+  const now = new Date('2026-11-04T12:00:00+08:00').getTime()
+  const week = 7 * 24 * 60 * 60 * 1000
+  const previousDay = new Date('2026-11-03T23:59:00+08:00').getTime()
+  const today = new Date('2026-11-04T00:00:00+08:00').getTime()
+  const todo = (id: number, content: string, changes: Partial<Todo> = {}): Todo => ({
+    id,
+    content,
+    createdAt: previousDay,
+    completedAt: 0,
+    autoDelete: true,
+    ...changes,
+  })
+
+  test('groups by local day and deletes only eligible records at the seven-day boundary', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(now)
+    await page.goto('/todo/list')
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+    await seedTodos(page, [
+      todo(1, '未完成'),
+      todo(2, '尚差一毫秒', { completedAt: now - week + 1 }),
+      todo(3, '恰好七天', { completedAt: now - week }),
+      todo(4, '已经过期', { completedAt: now - week - 1 }),
+      todo(5, '永久保留', { completedAt: now - week - 1, autoDelete: false }),
+      todo(6, '今天第一条', { createdAt: today }),
+      todo(7, '今天第二条', { createdAt: today + 1000 }),
+    ])
+    await page.reload()
+    await expect(page.locator('.todo-group h3')).toHaveText(['2026-11-04', '2026-11-03'])
+    await expect(page.locator('.todo-content')).toHaveText([
+      '今天第一条',
+      '今天第二条',
+      '未完成',
+      '尚差一毫秒',
+      '永久保留',
+    ])
+    expect((await readStoredTodos(page)).map((record) => record.id)).toEqual([1, 2, 5, 6, 7])
+    await expect(
+      page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
+    ).toBeChecked()
+    await page.getByRole('button', { name: '已完成', exact: true }).click()
+    await expect(page.locator('.todo-group h3')).toHaveText(['2026-11-03'])
+
+    await page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
+    ).not.toBeChecked()
+    await expect(page.locator('.todo-content')).toHaveText(['尚差一毫秒', '永久保留'])
+    await page.getByRole('link', { name: '新增待办', exact: true }).click()
+    await expect(page.getByRole('button', { name: '添加待办', exact: true })).toBeDisabled()
+    await expect
+      .poll(async () => (await readStoredTodos(page)).map((record) => record.id))
+      .toEqual([1, 2, 6, 7])
+  })
+
+  test('does not clean up while open or on visibility changes, but cleans up on refresh', async ({
+    page,
+  }) => {
+    await page.clock.install({ time: now - 60 * 60 * 1000 })
+    await page.goto('/todo/list')
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+    await page.clock.pauseAt(now)
+    await seedTodos(page, [todo(1, '即将到期', { completedAt: now - week + 1000 })])
+    await page.reload()
+    await expect(page.locator('.todo-content')).toHaveText(['即将到期'])
+    await page.clock.runFor(2 * 60 * 1000)
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await expect(page.locator('.todo-content')).toHaveText(['即将到期'])
+    expect(await readStoredTodos(page)).toHaveLength(1)
+    await page.reload()
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+    expect(await readStoredTodos(page)).toEqual([])
+  })
+
+  test('persists retention settings and restarts the period after restoring and completing a todo', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(now)
+    await page.goto('/todo/list')
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+    await seedTodos(page, [todo(1, '保留此条'), todo(2, '重新完成')])
+    await page.reload()
+    await page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
+    ).toBeChecked()
+    await page.getByRole('checkbox', { name: '完成待办：保留此条', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '恢复待办：保留此条', exact: true }),
+    ).toBeChecked()
+    await page.getByRole('checkbox', { name: '完成待办：重新完成', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '恢复待办：重新完成', exact: true }),
+    ).toBeChecked()
+    await page.clock.setFixedTime(now + week - 1000)
+    await page.reload()
+    await expect(page.locator('.todo-content')).toHaveText(['保留此条', '重新完成'])
+    await page.getByRole('checkbox', { name: '恢复待办：重新完成', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '完成待办：重新完成', exact: true }),
+    ).not.toBeChecked()
+    expect((await readStoredTodos(page))[1]?.completedAt).toBe(0)
+    await page.getByRole('checkbox', { name: '完成待办：重新完成', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '恢复待办：重新完成', exact: true }),
+    ).toBeChecked()
+    expect((await readStoredTodos(page))[1]?.completedAt).toBe(now + week - 1000)
+    await page.clock.setFixedTime(now + week + 1000)
+    await page.reload()
+    await expect(page.locator('.todo-content')).toHaveText(['保留此条', '重新完成'])
+    await page.clock.setFixedTime(now + 2 * week)
+    await page.reload()
+    await expect(page.locator('.todo-content')).toHaveText(['保留此条'])
+    await page.getByRole('button', { name: '删除待办：保留此条', exact: true }).click()
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+  })
+
+  test('rolls back failed expiration cleanup and retries without losing records', async ({
+    page,
+  }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    await page.clock.setFixedTime(now)
+    await page.goto('/todo/list')
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+    await seedTodos(page, [
+      todo(1, '过期一', { completedAt: now - week }),
+      todo(2, '过期二', { completedAt: now - week }),
+      todo(3, '未完成'),
+    ])
+    await page.evaluate(() => {
+      const originalDelete = IDBObjectStore.prototype.delete
+      let deletes = 0
+      IDBObjectStore.prototype.delete = function (key) {
+        const request = originalDelete.call(this, key)
+        if (this.name === 'todos' && ++deletes === 2) this.transaction.abort()
+        return request
+      }
+    })
+    await page.getByRole('link', { name: '新增待办', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('无法读取或清理本地待办')
+    expect((await readStoredTodos(page)).map((record) => record.id)).toEqual([1, 2, 3])
+    await page.getByRole('button', { name: '重试加载', exact: true }).click()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    expect((await readStoredTodos(page)).map((record) => record.id)).toEqual([3])
+    expect(pageErrors).toEqual([])
+  })
 })

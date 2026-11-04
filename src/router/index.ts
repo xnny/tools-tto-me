@@ -29,6 +29,12 @@ const router = createRouter({
       meta: { title: '待办事项' },
     },
     {
+      path: '/todo/list',
+      name: 'TodoList',
+      component: () => import('@/views/TodoListView.vue'),
+      meta: { title: '我的待办' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('@/views/NotFoundView.vue'),

@@ -3,8 +3,9 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 export interface Todo {
   id: number
   content: string
-  completed: boolean
   createdAt: number
+  completedAt: number
+  autoDelete: boolean
 }
 
 interface TodoDatabase extends DBSchema {
@@ -51,11 +52,37 @@ export const getTodos = async (): Promise<Todo[]> => {
   })
 }
 
+// Called only when a todo page is opened (or its failed initialization is retried).
+export const clearExpiredTodos = async (): Promise<void> => {
+  const database = await getDatabase()
+  const transaction = database.transaction('todos', 'readwrite')
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+
+  await Promise.all([
+    transaction.store.getAll().then((records) =>
+      Promise.all(
+        records
+          .filter((todo) => todo.autoDelete && todo.completedAt > 0 && todo.completedAt <= cutoff)
+          .map((todo) => {
+            if (todo.id === undefined) throw new Error('Todo is missing its ID')
+            return transaction.store.delete(todo.id)
+          }),
+      ),
+    ),
+    transaction.done,
+  ])
+}
+
 export const addTodos = async (contents: string[]): Promise<Todo[]> => {
   if (contents.length === 0) return []
 
   const createdAt = Date.now()
-  const records = contents.map((content) => ({ content, completed: false, createdAt }))
+  const records = contents.map((content) => ({
+    content,
+    createdAt,
+    completedAt: 0,
+    autoDelete: true,
+  }))
   const database = await getDatabase()
   const transaction = database.transaction('todos', 'readwrite')
 
@@ -72,7 +99,7 @@ export const addTodos = async (contents: string[]): Promise<Todo[]> => {
 
 export const updateTodo = async (
   id: number,
-  changes: Partial<Pick<Todo, 'content' | 'completed'>>,
+  changes: Partial<Pick<Todo, 'content' | 'completedAt' | 'autoDelete'>>,
 ): Promise<Todo> => {
   const database = await getDatabase()
   const transaction = database.transaction('todos', 'readwrite')
