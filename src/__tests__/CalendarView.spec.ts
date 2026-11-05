@@ -117,8 +117,13 @@ describe('calendar', () => {
   )
 
   it.each([
+    { holiday: '元旦', date: '2026-01-01', label: '元旦' },
     { holiday: '春节', date: '2026-02-17', label: '春节' },
     { holiday: '清明节', date: '2026-04-05', label: '清明' },
+    { holiday: '劳动节', date: '2026-05-01', label: '劳动节' },
+    { holiday: '端午节', date: '2026-06-19', label: '端午节' },
+    { holiday: '中秋节', date: '2026-09-25', label: '中秋节' },
+    { holiday: '国庆节', date: '2026-10-01', label: '国庆节' },
   ])('selects $holiday in the displayed year', async ({ holiday, date, label }) => {
     const wrapper = mount(CalendarView)
 

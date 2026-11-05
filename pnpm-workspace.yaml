@@ -1,3 +1,5 @@
 allowBuilds:
   esbuild: true
   workerd: true
+minimumReleaseAgeExclude:
+  - tyme4ts@1.5.5

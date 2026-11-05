@@ -1,4 +1,4 @@
-import { HolidayUtil, Solar } from 'lunar-typescript'
+import { SolarDay } from 'tyme4ts'
 
 export interface CalendarDay {
   date: Temporal.PlainDate
@@ -27,13 +27,27 @@ export function dateKey(date: Temporal.PlainDate): string {
 /** Convert one Gregorian date into the information shown on the calendar. */
 export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
   const { year, month, day } = date
-  const solar = Solar.fromYmd(year, month, day)
-  const lunar = solar.getLunar()
-  const lunarMonth = `${lunar.getMonthInChinese()}月`
-  const lunarDay = lunar.getDayInChinese()
-  const festivals = [...new Set([...solar.getFestivals(), ...lunar.getFestivals()])]
-  const solarTerm = lunar.getJieQi()
-  const holiday = HolidayUtil.getHoliday(year, month, day)
+  const solar = SolarDay.fromYmd(year, month, day)
+  const lunar = solar.getLunarDay()
+  const lunarMonth = lunar
+    .getLunarMonth()
+    .getName()
+    .replace('十一月', '冬月')
+    .replace('十二月', '腊月')
+  const lunarDay = lunar.getName()
+  // The displayed year and zodiac change at Lunar New Year, while the month follows solar terms.
+  const lunarYearCycle = lunar.getLunarMonth().getLunarYear().getSixtyCycle()
+  const sixtyCycleDay = solar.getSixtyCycleDay()
+  const festivals = [
+    ...new Set(
+      [solar.getFestival()?.getName(), lunar.getFestival()?.getName()].filter(
+        (name) => name !== undefined,
+      ),
+    ),
+  ]
+  const termDay = solar.getTermDay()
+  const solarTerm = termDay.getDayIndex() === 0 ? termDay.getSolarTerm().getName() : ''
+  const holiday = solar.getLegalHoliday()
 
   return {
     date,
@@ -42,16 +56,16 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
     inMonth: true,
     lunarLabel: festivals[0] || solarTerm || (lunar.getDay() === 1 ? lunarMonth : lunarDay),
     lunarDate: `${lunarMonth}${lunarDay}`,
-    lunarYear: `${lunar.getYearInChinese()}年`,
-    gzYear: lunar.getYearInGanZhi(),
-    gzMonth: lunar.getMonthInGanZhi(),
-    gzDay: lunar.getDayInGanZhi(),
-    zodiac: lunar.getYearShengXiao(),
+    lunarYear: `${String(lunar.getYear()).replace(/\d/g, (digit) => '〇一二三四五六七八九'.charAt(Number(digit)))}年`,
+    gzYear: lunarYearCycle.getName(),
+    gzMonth: sixtyCycleDay.getMonth().getName(),
+    gzDay: sixtyCycleDay.getSixtyCycle().getName(),
+    zodiac: lunarYearCycle.getEarthBranch().getZodiac().getName(),
     festivals,
     solarTerm,
     holiday: holiday ? (holiday.isWork() ? '班' : '休') : null,
-    yi: lunar.getDayYi(),
-    ji: lunar.getDayJi(),
+    yi: lunar.getRecommends().map((item) => item.getName()),
+    ji: lunar.getAvoids().map((item) => item.getName()),
   }
 }
 

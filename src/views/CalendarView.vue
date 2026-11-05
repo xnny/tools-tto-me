@@ -97,7 +97,7 @@ function selectHoliday() {
             <span class="sr-only">选择节日</span>
             <select v-model="holiday" @change="selectHoliday">
               <option value="">节日选择</option>
-              <option v-for="item in ['元旦节', '春节', '清明节', '劳动节', '端午节', '中秋节', '国庆节']" :key="item" :value="item">{{ item }}</option>
+              <option v-for="item in ['元旦', '春节', '清明节', '劳动节', '端午节', '中秋节', '国庆节']" :key="item" :value="item">{{ item }}</option>
             </select>
           </label>
         </div>
