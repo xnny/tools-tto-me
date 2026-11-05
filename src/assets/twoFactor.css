@@ -257,6 +257,26 @@ select:disabled {
   color: var(--color-primary);
   background: var(--color-primary-soft);
 }
+.copy-code,
+.copy-secret {
+  display: inline-grid;
+  justify-items: center;
+}
+.copy-code::after,
+.copy-secret::after {
+  height: 0;
+  line-height: 0;
+  visibility: hidden;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.copy-code::after {
+  content: '复制验证码';
+}
+.copy-secret::after {
+  content: '复制密钥';
+}
 .delete-button {
   margin-left: auto;
 }

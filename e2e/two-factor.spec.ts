@@ -97,15 +97,19 @@ test('persists accounts, shows RFC codes across a period boundary, and copies an
   await expect(page.locator('.secret-qr')).toHaveCount(0)
 
   const copySecretBtn = page.getByRole('button', { name: '复制密钥：alice@example.com', exact: true })
+  const secretWidthBefore = (await copySecretBtn.boundingBox())?.width
   await copySecretBtn.click()
   expect(await page.evaluate(() => sessionStorage.getItem('test-copied-text'))).toBe(secret)
   await expect(copySecretBtn).toHaveText('已复制')
+  expect((await copySecretBtn.boundingBox())?.width).toBe(secretWidthBefore)
 
   await page.clock.setFixedTime(1_111_111_111_000)
   const copyCodeBtn = page.getByRole('button', { name: '复制验证码：alice@example.com', exact: true })
+  const codeWidthBefore = (await copyCodeBtn.boundingBox())?.width
   await copyCodeBtn.click()
   expect(await page.evaluate(() => sessionStorage.getItem('test-copied-text'))).toBe('14050471')
   await expect(copyCodeBtn).toHaveText('已复制')
+  expect((await copyCodeBtn.boundingBox())?.width).toBe(codeWidthBefore)
   await expect(page.locator('.otp-code')).toHaveText('14050471')
 
   page.once('dialog', (dialog) => dialog.dismiss())
