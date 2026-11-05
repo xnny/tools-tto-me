@@ -1,73 +1,79 @@
 # tools-tto-me
 
-This template should help get you started developing with Vue 3 in Vite.
+一个轻量、纯前端、隐私优先的在线工具箱，包含日历、时间戳转换、待办事项和两步验证等实用工具。
 
-## Recommended IDE Setup
+所有数据完全保存在浏览器本地（IndexedDB / LocalStorage），不经过任何后端服务器，保证个人数据和密钥隐私安全。
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 功能特性
 
-## Recommended Browser Setup
+- 📅 **日历 (Calendar)**：公历与农历对照、二十四节气、法定节假日安排以及每日宜忌展示。
+- ⏱️ **时间戳转换 (Timezone Converter)**：支持时间戳与日期时间互相转换，支持批量多行输入、快捷时区切换与本地历史记录。
+- 📝 **待办事项 (Todo)**：支持批量快速添加、按日期分组聚合、完成状态管理与到期自动清理，数据本地存储。
+- 🔐 **两步验证 (Two-Factor Authenticator)**：基于 RFC 6238 标准的 TOTP 动态验证码工具。支持解析二维码截图、生成动态验证码、展示/隐藏密钥以及本地 JSON 数据备份导出。
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## 技术栈
 
-## Type Support for `.vue` Imports in TS
+- **框架**：Vue 3 (Composition API) + TypeScript
+- **构建工具**：Vite
+- **本地存储**：IndexedDB (`idb`)
+- **测试**：Vitest（单元测试）+ Playwright（端到端测试）
+- **代码规范**：ESLint + Oxlint + Prettier
+- **部署**：支持 Cloudflare Pages 静态部署
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## 项目快速开始
 
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+### 安装依赖
 
 ```sh
 pnpm install
 ```
 
-### Compile and Hot-Reload for Development
+### 开发环境运行
 
 ```sh
 pnpm dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### 生产环境构建
 
 ```sh
 pnpm build
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+### 运行测试
 
 ```sh
+# 运行单元测试
 pnpm test:unit
-```
 
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
-
-```sh
-# Install browsers for the first run
-npx playwright install
-
-# When testing on CI, must build the project first
-pnpm build
-
-# Runs the end-to-end tests
+# 运行端到端测试 (Playwright)
 pnpm test:e2e
-# Runs the tests only on Chromium
-pnpm test:e2e --project=chromium
-# Runs the tests of a specific file
-pnpm test:e2e tests/example.spec.ts
-# Runs the tests in debug mode
-pnpm test:e2e --debug
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### 代码规范检查与格式化
 
 ```sh
+# 代码 Lint 检查并修复
 pnpm lint
+
+# 代码格式化
+pnpm format
 ```
+
+## 部署到 Cloudflare Pages
+
+本项目提供了部署脚本 [`scripts/deploy-cloudflare-pages.mjs`](scripts/deploy-cloudflare-pages.mjs)：
+
+1. 复制配置模版：
+   ```sh
+   cp .env.cloudflare.example .env.cloudflare
+   ```
+2. 在 `.env.cloudflare` 中填入你的 Cloudflare 凭据（Account ID 与 API Token）。
+3. 执行部署命令：
+   ```sh
+   pnpm run deploy:pages
+   ```
+
+## 开源协议
+
+本项目基于 [MIT License](LICENSE) 开源。

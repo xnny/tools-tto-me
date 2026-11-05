@@ -8,7 +8,7 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       // Node 24 exposes native Temporal behind this flag.
-      execArgv: ['--harmony-temporal'],
+      execArgv: ['--harmony-temporal', '--no-experimental-webstorage'],
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },

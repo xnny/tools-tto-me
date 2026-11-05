@@ -39,5 +39,8 @@ __screenshots__/
 
 test-results/
 playwright-report/
-.env.cloudflare
+.env
+.env.*
+!.env.example
+!.env.cloudflare.example
 .wrangler
