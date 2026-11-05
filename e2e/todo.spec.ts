@@ -252,25 +252,42 @@ test.describe('date groups and expiration', () => {
       '永久保留',
     ])
     expect((await readStoredTodos(page)).map((record) => record.id)).toEqual([1, 2, 5, 6, 7])
-    await expect(page.getByRole('checkbox', { name: /^不自动删除：/ })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: /^自动删除：/ })).toHaveCount(0)
     await page.getByRole('button', { name: '已完成', exact: true }).click()
     await expect(page.locator('.todo-group h3')).toHaveText(['2026-11-03'])
 
     await page.getByRole('button', { name: '编辑待办：永久保留', exact: true }).click()
     await expect(
-      page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
-    ).toBeChecked()
-    await page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }).click()
-    await expect(
-      page.getByRole('checkbox', { name: '不自动删除：永久保留', exact: true }),
+      page.getByRole('checkbox', { name: '自动删除：永久保留', exact: true }),
     ).not.toBeChecked()
+    await expect(page.locator('.deletion-countdown')).toHaveCount(0)
+    await page.getByRole('checkbox', { name: '自动删除：永久保留', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '自动删除：永久保留', exact: true }),
+    ).toBeChecked()
+    await expect(page.locator('.deletion-countdown')).toHaveText('7 天 00:00:00 后删除')
     await page.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(page.locator('.todo-content')).toHaveText(['尚差一毫秒', '永久保留'])
+    expect((await readStoredTodos(page)).find((record) => record.id === 5)).toMatchObject({
+      completedAt: now - week - 1,
+      autoDelete: true,
+      autoDeleteStartedAt: now,
+    })
     await page.getByRole('link', { name: '新增待办', exact: true }).click()
     await expect(page.getByRole('button', { name: '添加待办', exact: true })).toBeDisabled()
     await expect
       .poll(async () => (await readStoredTodos(page)).map((record) => record.id))
-      .toEqual([1, 2, 6, 7])
+      .toEqual([1, 2, 5, 6, 7])
+    await page.getByRole('link', { name: '我的待办', exact: true }).click()
+    await page.getByRole('button', { name: '编辑待办：永久保留', exact: true }).click()
+    await expect(page.locator('.deletion-countdown')).toHaveText('7 天 00:00:00 后删除')
+    await page.clock.setFixedTime(now + week - 1)
+    await page.reload()
+    await expect(page.locator('.todo-content')).toContainText(['永久保留'])
+    await page.clock.setFixedTime(now + week)
+    await page.reload()
+    await expect(page.locator('.todo-content')).toHaveText(['今天第一条', '今天第二条', '未完成'])
+    expect((await readStoredTodos(page)).map((record) => record.id)).toEqual([1, 6, 7])
   })
 
   test('does not clean up while open or on visibility changes, but cleans up on refresh', async ({
@@ -283,7 +300,11 @@ test.describe('date groups and expiration', () => {
     await seedTodos(page, [todo(1, '即将到期', { completedAt: now - week + 1000 })])
     await page.reload()
     await expect(page.locator('.todo-content')).toHaveText(['即将到期'])
+    await page.getByRole('button', { name: '编辑待办：即将到期', exact: true }).click()
+    await expect(page.locator('.deletion-countdown')).toHaveText('00:00:01 后删除')
     await page.clock.runFor(2 * 60 * 1000)
+    await expect(page.locator('.deletion-countdown')).toHaveText('下次打开或刷新时删除')
+    await page.getByRole('button', { name: '取消', exact: true }).click()
     await page.evaluate(() => {
       window.dispatchEvent(new Event('focus'))
       document.dispatchEvent(new Event('visibilitychange'))
@@ -303,26 +324,32 @@ test.describe('date groups and expiration', () => {
     await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
     await seedTodos(page, [todo(1, '保留此条'), todo(2, '重新完成')])
     await page.reload()
-    await expect(page.getByRole('checkbox', { name: /^不自动删除：/ })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: /^自动删除：/ })).toHaveCount(0)
     await page.getByRole('button', { name: '编辑待办：保留此条', exact: true }).click()
-    await page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }).click()
     await expect(
-      page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
+      page.getByRole('checkbox', { name: '自动删除：保留此条', exact: true }),
     ).toBeChecked()
+    await expect(page.locator('.deletion-countdown')).toHaveText('完成后 7 天删除')
+    await page.getByRole('checkbox', { name: '自动删除：保留此条', exact: true }).click()
+    await expect(
+      page.getByRole('checkbox', { name: '自动删除：保留此条', exact: true }),
+    ).not.toBeChecked()
+    await expect(page.locator('.deletion-countdown')).toHaveCount(0)
     await page.getByRole('button', { name: '取消', exact: true }).click()
     expect((await readStoredTodos(page))[0]?.autoDelete).toBe(true)
     await page.getByRole('button', { name: '编辑待办：保留此条', exact: true }).click()
     await expect(
-      page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
-    ).not.toBeChecked()
-    await page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }).click()
+      page.getByRole('checkbox', { name: '自动删除：保留此条', exact: true }),
+    ).toBeChecked()
+    await page.getByRole('checkbox', { name: '自动删除：保留此条', exact: true }).click()
     await page.getByRole('button', { name: '保存修改', exact: true }).click()
-    await expect(page.getByRole('checkbox', { name: /^不自动删除：/ })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: /^自动删除：/ })).toHaveCount(0)
     await page.reload()
     await page.getByRole('button', { name: '编辑待办：保留此条', exact: true }).click()
     await expect(
-      page.getByRole('checkbox', { name: '不自动删除：保留此条', exact: true }),
-    ).toBeChecked()
+      page.getByRole('checkbox', { name: '自动删除：保留此条', exact: true }),
+    ).not.toBeChecked()
+    await expect(page.locator('.deletion-countdown')).toHaveCount(0)
     await page.getByRole('button', { name: '取消', exact: true }).click()
     await page.getByRole('checkbox', { name: '完成待办：保留此条', exact: true }).click()
     await expect(
@@ -353,6 +380,45 @@ test.describe('date groups and expiration', () => {
     await expect(page.locator('.todo-content')).toHaveText(['保留此条'])
     await page.getByRole('button', { name: '删除待办：保留此条', exact: true }).click()
     await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+  })
+
+  test('resets the countdown when toggled off and on in one edit, saving only on submit', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(now)
+    await page.goto('/todo/list')
+    await expect(page.getByText('还没有待办，去新增第一条吧。')).toBeVisible()
+    const original = todo(1, '重置倒计时', { completedAt: now - week + 60 * 60 * 1000 })
+    await seedTodos(page, [original])
+    await page.reload()
+    const automaticDeletion = page.getByRole('checkbox', {
+      name: '自动删除：重置倒计时',
+      exact: true,
+    })
+    const countdown = page.locator('.deletion-countdown')
+
+    await page.getByRole('button', { name: '编辑待办：重置倒计时', exact: true }).click()
+    await expect(automaticDeletion).toBeChecked()
+    await expect(countdown).toHaveText('01:00:00 后删除')
+    await automaticDeletion.click()
+    await expect(countdown).toHaveCount(0)
+    await automaticDeletion.click()
+    await expect(countdown).toHaveText('7 天 00:00:00 后删除')
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    expect(await readStoredTodos(page)).toEqual([original])
+
+    await page.getByRole('button', { name: '编辑待办：重置倒计时', exact: true }).click()
+    await expect(countdown).toHaveText('01:00:00 后删除')
+    await automaticDeletion.click()
+    await automaticDeletion.click()
+    await page.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(page.locator('.todo-content')).toHaveText(['重置倒计时'])
+    expect(await readStoredTodos(page)).toEqual([{ ...original, autoDeleteStartedAt: now }])
+    await page.clock.setFixedTime(now + 60 * 60 * 1000)
+    await page.reload()
+    await page.getByRole('button', { name: '编辑待办：重置倒计时', exact: true }).click()
+    await expect(automaticDeletion).toBeChecked()
+    await expect(countdown).toHaveText('6 天 23:00:00 后删除')
   })
 
   test('rolls back failed expiration cleanup and retries without losing records', async ({

@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { clearExpiredTodos, getTodos, removeTodo, updateTodo, type Todo } from '@/utils/todoStorage'
+import {
+  clearExpiredTodos,
+  getTodoDeleteAt,
+  getTodos,
+  removeTodo,
+  updateTodo,
+  type Todo,
+} from '@/utils/todoStorage'
 
 type TodoFilter = 'all' | 'active' | 'completed'
 
@@ -18,7 +25,33 @@ const loadError = ref('')
 const operationError = ref('')
 const editingId = ref(0)
 const editValue = ref('')
-const editRetention = ref(false)
+const editAutoDelete = ref(true)
+const editAutoDeleteStartedAt = ref<number>()
+const now = ref(Date.now())
+let countdownTimer: ReturnType<typeof setInterval> | undefined
+const deletionCountdown = computed(() => {
+  const todo = todos.value.find((item) => item.id === editingId.value)
+  if (!todo || !editAutoDelete.value) return ''
+  if (todo.completedAt === 0) return '完成后 7 天删除'
+
+  const deleteAt = getTodoDeleteAt({
+    ...todo,
+    autoDelete: true,
+    autoDeleteStartedAt: editAutoDeleteStartedAt.value ?? todo.autoDeleteStartedAt,
+  })
+  const seconds = Math.max(0, Math.ceil((deleteAt - now.value) / 1000))
+  if (seconds === 0) return '下次打开或刷新时删除'
+
+  const days = Math.floor(seconds / 86400)
+  const time = [
+    Math.floor((seconds % 86400) / 3600),
+    Math.floor((seconds % 3600) / 60),
+    seconds % 60,
+  ]
+    .map((value) => String(value).padStart(2, '0'))
+    .join(':')
+  return `${days > 0 ? `${days} 天 ` : ''}${time} 后删除`
+})
 const busy = computed(() => loading.value || saving.value)
 const activeCount = computed(() => todos.value.filter((todo) => todo.completedAt === 0).length)
 const todoGroups = computed(() => {
@@ -99,7 +132,9 @@ const deleteTodo = async (todo: Todo) => {
 const startEditing = async (todo: Todo) => {
   editingId.value = todo.id
   editValue.value = todo.content
-  editRetention.value = !todo.autoDelete
+  editAutoDelete.value = todo.autoDelete
+  editAutoDeleteStartedAt.value = undefined
+  now.value = Date.now()
   operationError.value = ''
   await nextTick()
   document.getElementById('todo-edit-input')?.focus()
@@ -109,10 +144,18 @@ const finishEditing = async () => {
   const id = editingId.value
   editingId.value = 0
   editValue.value = ''
-  editRetention.value = false
+  editAutoDelete.value = true
+  editAutoDeleteStartedAt.value = undefined
   operationError.value = ''
   await nextTick()
   document.getElementById(`todo-edit-${id}`)?.focus()
+}
+
+const toggleEditAutoDelete = (todo: Todo, event: Event) => {
+  editAutoDelete.value = (event.target as HTMLInputElement).checked
+  now.value = Date.now()
+  editAutoDeleteStartedAt.value =
+    editAutoDelete.value && todo.completedAt > 0 ? now.value : undefined
 }
 
 const saveEdit = async (todo: Todo) => {
@@ -123,13 +166,25 @@ const saveEdit = async (todo: Todo) => {
 
   const saved = await mutateTodo(async () => {
     replaceTodo(
-      await updateTodo(todo.id, { content: editValue.value, autoDelete: !editRetention.value }),
+      await updateTodo(todo.id, {
+        content: editValue.value,
+        autoDelete: editAutoDelete.value,
+        ...(editAutoDeleteStartedAt.value !== undefined
+          ? { autoDeleteStartedAt: editAutoDeleteStartedAt.value }
+          : {}),
+      }),
     )
   }, '待办修改保存失败，编辑内容已保留，请重试。')
   if (saved) await finishEditing()
 }
 
-onMounted(loadTodos)
+onMounted(() => {
+  void loadTodos()
+  countdownTimer = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
+})
+onUnmounted(() => clearInterval(countdownTimer))
 </script>
 
 <template>
@@ -209,15 +264,25 @@ onMounted(loadTodos)
                     rows="5"
                     :disabled="saving"
                   ></textarea>
-                  <label class="retention-option">
-                    <input
-                      v-model="editRetention"
-                      type="checkbox"
-                      :disabled="saving"
-                      :aria-label="`不自动删除：${todo.content}`"
-                    />
-                    不自动删除
-                  </label>
+                  <div class="retention-settings">
+                    <label class="retention-option">
+                      <input
+                        type="checkbox"
+                        :checked="editAutoDelete"
+                        :disabled="saving"
+                        :aria-label="`自动删除：${todo.content}`"
+                        :aria-describedby="editAutoDelete ? 'todo-deletion-countdown' : undefined"
+                        @change="toggleEditAutoDelete(todo, $event)"
+                      />
+                      自动删除
+                    </label>
+                    <span
+                      v-if="editAutoDelete"
+                      id="todo-deletion-countdown"
+                      class="deletion-countdown"
+                      >{{ deletionCountdown }}</span
+                    >
+                  </div>
                   <div class="edit-actions">
                     <button
                       type="submit"
@@ -265,7 +330,9 @@ onMounted(loadTodos)
       </template>
     </section>
 
-    <p class="footnote">完成满 7 天后，在下次打开或刷新页面时自动删除，也可逐条设置保留。</p>
+    <p class="footnote">
+      完成满 7 天后，在下次打开或刷新页面时自动删除；取消后重新开启自动删除会重新计时。
+    </p>
   </main>
 </template>
 

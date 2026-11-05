@@ -6,6 +6,17 @@ export interface Todo {
   createdAt: number
   completedAt: number
   autoDelete: boolean
+  autoDeleteStartedAt?: number
+}
+
+export const TODO_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+
+export const getTodoDeleteAt = (
+  todo: Pick<Todo, 'autoDelete' | 'completedAt' | 'autoDeleteStartedAt'>,
+): number => {
+  if (!todo.autoDelete || todo.completedAt === 0) return 0
+  // Existing records count from completion until automatic deletion is reset.
+  return (todo.autoDeleteStartedAt || todo.completedAt) + TODO_RETENTION_MS
 }
 
 interface TodoDatabase extends DBSchema {
@@ -56,13 +67,16 @@ export const getTodos = async (): Promise<Todo[]> => {
 export const clearExpiredTodos = async (): Promise<void> => {
   const database = await getDatabase()
   const transaction = database.transaction('todos', 'readwrite')
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const now = Date.now()
 
   await Promise.all([
     transaction.store.getAll().then((records) =>
       Promise.all(
         records
-          .filter((todo) => todo.autoDelete && todo.completedAt > 0 && todo.completedAt <= cutoff)
+          .filter((todo) => {
+            const deleteAt = getTodoDeleteAt(todo)
+            return deleteAt > 0 && deleteAt <= now
+          })
           .map((todo) => {
             if (todo.id === undefined) throw new Error('Todo is missing its ID')
             return transaction.store.delete(todo.id)
@@ -99,7 +113,7 @@ export const addTodos = async (contents: string[]): Promise<Todo[]> => {
 
 export const updateTodo = async (
   id: number,
-  changes: Partial<Pick<Todo, 'content' | 'completedAt' | 'autoDelete'>>,
+  changes: Partial<Pick<Todo, 'content' | 'completedAt' | 'autoDelete' | 'autoDeleteStartedAt'>>,
 ): Promise<Todo> => {
   const database = await getDatabase()
   const transaction = database.transaction('todos', 'readwrite')
@@ -107,6 +121,13 @@ export const updateTodo = async (
     transaction.store.get(id).then(async (record) => {
       if (!record) throw new Error('Todo no longer exists')
       const updated = { ...record, ...changes, id }
+      if (!updated.autoDelete || updated.completedAt === 0) {
+        updated.autoDeleteStartedAt = 0
+      } else if (record.completedAt === 0) {
+        updated.autoDeleteStartedAt = updated.completedAt
+      } else if (!record.autoDelete) {
+        updated.autoDeleteStartedAt = changes.autoDeleteStartedAt ?? Date.now()
+      }
       await transaction.store.put(updated)
       return updated
     }),

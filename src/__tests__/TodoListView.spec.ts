@@ -5,11 +5,13 @@ import {
   clearExpiredTodos,
   getTodos,
   removeTodo,
+  TODO_RETENTION_MS,
   updateTodo,
   type Todo,
 } from '../utils/todoStorage'
 
-vi.mock('../utils/todoStorage', () => ({
+vi.mock('../utils/todoStorage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/todoStorage')>()),
   clearExpiredTodos: vi.fn<typeof clearExpiredTodos>(),
   getTodos: vi.fn<typeof getTodos>(),
   removeTodo: vi.fn<typeof removeTodo>(),
@@ -108,7 +110,9 @@ describe('my todos page', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('完成状态保存失败')
   })
 
-  it('persists the retention preference without altering the completion time or cleaning up', async () => {
+  it('defaults to automatic deletion and saves disabling or re-enabling it without cleaning up', async () => {
+    const now = createdAt + 3 * 86400000
+    vi.spyOn(Date, 'now').mockReturnValue(now)
     vi.mocked(updateTodo).mockImplementation(async (id, changes) => ({
       ...secondTodo,
       ...changes,
@@ -117,7 +121,11 @@ describe('my todos page', () => {
     const wrapper = await renderTodos()
     expect(wrapper.find('.retention-option').exists()).toBe(false)
     await wrapper.get('#todo-edit-2').trigger('click')
-    await wrapper.get('.todo-editor .retention-option input').setValue(true)
+    expect(wrapper.get('.retention-option').text()).toBe('自动删除')
+    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(true)
+    expect(wrapper.find('.deletion-countdown').exists()).toBe(true)
+    await wrapper.get('.todo-editor .retention-option input').setValue(false)
+    expect(wrapper.find('.deletion-countdown').exists()).toBe(false)
     expect(updateTodo).not.toHaveBeenCalled()
     await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
@@ -128,13 +136,15 @@ describe('my todos page', () => {
     expect(wrapper.find('.retention-option').exists()).toBe(false)
     expect(wrapper.get<HTMLInputElement>('#todo-complete-2').element.checked).toBe(true)
     await wrapper.get('#todo-edit-2').trigger('click')
-    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(true)
-    await wrapper.get('.retention-option input').setValue(false)
+    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(false)
+    await wrapper.get('.retention-option input').setValue(true)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('7 天 00:00:00 后删除')
     await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
     expect(updateTodo).toHaveBeenLastCalledWith(2, {
       content: secondTodo.content,
       autoDelete: true,
+      autoDeleteStartedAt: now,
     })
     expect(clearExpiredTodos).toHaveBeenCalledTimes(1)
     expect(wrapper.findAll('.todo-item')).toHaveLength(2)
@@ -145,19 +155,73 @@ describe('my todos page', () => {
     const wrapper = await renderTodos()
     await wrapper.get('#todo-edit-1').trigger('click')
     const retention = wrapper.get<HTMLInputElement>('.retention-option input')
-    await retention.setValue(true)
+    await retention.setValue(false)
     await wrapper.get('.todo-editor').trigger('submit')
     await flushPromises()
-    expect(retention.element.checked).toBe(true)
+    expect(retention.element.checked).toBe(false)
     expect(wrapper.get('[role="alert"]').text()).toContain('编辑内容已保留')
     await wrapper.get('.todo-editor button[type="button"]').trigger('click')
     expect(wrapper.find('.retention-option').exists()).toBe(false)
     await wrapper.get('#todo-edit-1').trigger('click')
-    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(false)
+    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(true)
     expect(updateTodo).toHaveBeenCalledExactlyOnceWith(1, {
       content: firstTodo.content,
       autoDelete: false,
     })
+  })
+
+  it('updates the countdown each second and stops its timer on unmount', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(secondTodo.completedAt + TODO_RETENTION_MS - 2000)
+    const wrapper = await renderTodos()
+    await wrapper.get('#todo-edit-2').trigger('click')
+    expect(wrapper.get('.deletion-countdown').text()).toBe('00:00:02 后删除')
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('00:00:01 后删除')
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('下次打开或刷新时删除')
+    expect(clearExpiredTodos).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('.todo-item')).toHaveLength(2)
+    wrapper.unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('starts the countdown only after completion', async () => {
+    const wrapper = await renderTodos()
+    await wrapper.get('#todo-edit-1').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('.retention-option input').element.checked).toBe(true)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('完成后 7 天删除')
+    await wrapper.get('.retention-option input').setValue(false)
+    expect(wrapper.find('.deletion-countdown').exists()).toBe(false)
+    await wrapper.get('.retention-option input').setValue(true)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('完成后 7 天删除')
+  })
+
+  it('resets the countdown within one edit and discards the reset on cancel', async () => {
+    vi.useFakeTimers()
+    const now = secondTodo.completedAt + 3 * 86400000
+    vi.setSystemTime(now)
+    const wrapper = await renderTodos()
+    await wrapper.get('#todo-edit-2').trigger('click')
+    expect(wrapper.get('.deletion-countdown').text()).toBe('4 天 00:00:00 后删除')
+    await wrapper.get('.retention-option input').setValue(false)
+    await wrapper.get('.retention-option input').setValue(true)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('7 天 00:00:00 后删除')
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.get('.deletion-countdown').text()).toBe('6 天 23:59:59 后删除')
+    expect(updateTodo).not.toHaveBeenCalled()
+    await wrapper.get('.todo-editor button[type="button"]').trigger('click')
+    await wrapper.get('#todo-edit-2').trigger('click')
+    expect(wrapper.get('.deletion-countdown').text()).toBe('3 天 23:59:59 后删除')
+  })
+
+  it('uses the saved reset time for existing todos', async () => {
+    const autoDeleteStartedAt = secondTodo.completedAt + 3 * 86400000
+    vi.spyOn(Date, 'now').mockReturnValue(autoDeleteStartedAt + 86400000)
+    vi.mocked(getTodos).mockResolvedValue([{ ...secondTodo, autoDeleteStartedAt }])
+    const wrapper = await renderTodos()
+    await wrapper.get('#todo-edit-2').trigger('click')
+    expect(wrapper.get('.deletion-countdown').text()).toBe('6 天 00:00:00 后删除')
   })
 
   it('saves multiline edits without changing creation or completion timestamps', async () => {
@@ -223,7 +287,8 @@ describe('my todos page', () => {
   it('only runs cleanup on page entry, never on elapsed time or focus/visibility events', async () => {
     vi.useFakeTimers()
     const wrapper = await renderTodos()
-    await vi.advanceTimersByTimeAsync(8 * 24 * 60 * 60 * 1000)
+    vi.setSystemTime(Date.now() + 8 * 24 * 60 * 60 * 1000)
+    await vi.advanceTimersByTimeAsync(1000)
     window.dispatchEvent(new Event('focus'))
     document.dispatchEvent(new Event('visibilitychange'))
     await flushPromises()
