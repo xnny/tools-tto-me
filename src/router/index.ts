@@ -35,6 +35,12 @@ const router = createRouter({
       meta: { title: '我的待办' },
     },
     {
+      path: '/2af',
+      name: 'TwoFactor',
+      component: () => import('@/views/TwoFactorView.vue'),
+      meta: { title: '两步验证' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('@/views/NotFoundView.vue'),

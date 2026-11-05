@@ -36,4 +36,12 @@ export const tools: ToolItem[] = [
     icon: 'M9 5h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2m2-2h6v4H9V3Zm-1 11 3 3 5-6',
     color: '#16a085',
   },
+  {
+    name: 'TwoFactor',
+    path: '/2af',
+    title: '两步验证',
+    description: '本地管理验证密钥，支持二维码截图导入、动态验证码与密钥导出。',
+    icon: 'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Zm-4 9 3 3 5-6',
+    color: '#7c5cce',
+  },
 ]

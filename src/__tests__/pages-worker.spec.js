@@ -12,6 +12,7 @@ describe('Pages SPA response status', () => {
     '/timezone/utf-8', '/timezone/utc8', '/timezone/utc+100',
     '/todo', '/TODO/', '/todo/list', '/TODO/LIST/', '/todo/list/extra', '/todo/extra',
     '/calendar/extra', '/unknown', '/assets/missing.js',
+    '/2af', '/2AF/', '/2af/extra',
   ])('matches the client router for %s', async (path) => {
     const response = await worker.fetch(new Request(`https://example.com${path}`), env)
     expect(response.status).toBe(router.resolve(path).name === 'NotFound' ? 404 : 200)
