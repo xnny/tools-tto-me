@@ -25,6 +25,8 @@ const defaultForm = (): TotpConfig => ({
 })
 const form = reactive(defaultForm())
 const inputValue = ref('')
+const activeTab = ref<'manual' | 'qr'>('manual')
+const dragging = ref(false)
 const records = ref<TotpRecord[]>([])
 const loading = ref(true)
 const saving = ref(false)
@@ -39,8 +41,16 @@ type SecretQrState =
   { status: 'loading' } | { status: 'ready'; src: string } | { status: 'error'; message: string }
 const secretQrStates = reactive(new Map<number, SecretQrState>())
 const secretQrRequests = new Map<number, symbol>()
+const activeQrRecordId = ref<number | null>(null)
+const copiedStates = reactive(new Map<string, ReturnType<typeof setTimeout>>())
 const now = ref(Date.now())
 const storageBusy = computed(() => loading.value || saving.value || Boolean(loadError.value))
+const activeQrRecord = computed(
+  () => records.value.find((record) => record.id === activeQrRecordId.value) ?? null,
+)
+const activeQrState = computed(() =>
+  activeQrRecord.value ? (secretQrStates.get(activeQrRecord.value.id) ?? null) : null,
+)
 const displayedRecords = computed(() =>
   records.value.map((record) => {
     try {
@@ -48,7 +58,6 @@ const displayedRecords = computed(() =>
         record,
         ...getTotpState(record, now.value),
         error: '',
-        qr: secretQrStates.get(record.id),
       }
     } catch {
       return {
@@ -56,7 +65,6 @@ const displayedRecords = computed(() =>
         code: '',
         remaining: 0,
         error: '无法生成验证码，请删除后重新添加。',
-        qr: secretQrStates.get(record.id),
       }
     }
   }),
@@ -100,12 +108,8 @@ const readUriOnChange = () => {
   if (inputValue.value.trim().includes('://')) readInput()
 }
 
-const readScreenshot = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file || saving.value) return
-
+const processScreenshotFile = async (file: File) => {
+  if (saving.value) return
   inputChanged()
   const revision = inputRevision
   scanning.value = true
@@ -121,6 +125,61 @@ const readScreenshot = async (event: Event) => {
   } finally {
     if (active && revision === inputRevision) scanning.value = false
   }
+}
+
+const readScreenshot = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  await processScreenshotFile(file)
+}
+
+const onDragEnter = () => {
+  if (!saving.value) dragging.value = true
+}
+
+const onDragOver = () => {
+  if (!saving.value) dragging.value = true
+}
+
+const onDragLeave = (event: DragEvent) => {
+  const currentTarget = event.currentTarget as HTMLElement | null
+  const relatedTarget = event.relatedTarget as Node | null
+  if (!currentTarget || !relatedTarget || !currentTarget.contains(relatedTarget)) {
+    dragging.value = false
+  }
+}
+
+const onDropScreenshot = (event: DragEvent) => {
+  dragging.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (file) void processScreenshotFile(file)
+}
+
+const extractClipboardFile = (clipboardData: DataTransfer | null): File | undefined => {
+  if (!clipboardData) return undefined
+  for (const item of Array.from(clipboardData.items ?? [])) {
+    if (item.kind === 'file') {
+      const file = item.getAsFile()
+      if (file) return file
+    }
+  }
+  return clipboardData.files?.[0]
+}
+
+const onPasteScreenshot = (event: ClipboardEvent) => {
+  if (saving.value || event.defaultPrevented) return
+  const file = extractClipboardFile(event.clipboardData)
+  if (!file) return
+  event.preventDefault()
+  activeTab.value = 'qr'
+  void processScreenshotFile(file)
+}
+
+const onDocumentPaste = (event: ClipboardEvent) => {
+  if (activeTab.value !== 'qr') return
+  onPasteScreenshot(event)
 }
 
 const loadRecords = async () => {
@@ -166,12 +225,19 @@ const addRecord = async () => {
   }
 }
 
-const hideSecretQr = (id: number) => {
-  secretQrRequests.delete(id)
-  secretQrStates.delete(id)
+const hideSecretQr = (id?: number) => {
+  const targetId = id ?? activeQrRecordId.value
+  if (targetId === null || targetId === undefined) return
+  secretQrRequests.delete(targetId)
+  secretQrStates.delete(targetId)
+  if (activeQrRecordId.value === targetId) activeQrRecordId.value = null
 }
 
 const showSecretQr = async (record: TotpRecord) => {
+  if (activeQrRecordId.value !== null && activeQrRecordId.value !== record.id) {
+    hideSecretQr(activeQrRecordId.value)
+  }
+  activeQrRecordId.value = record.id
   const request = Symbol()
   secretQrRequests.set(record.id, request)
   secretQrStates.set(record.id, { status: 'loading' })
@@ -191,9 +257,39 @@ const showSecretQr = async (record: TotpRecord) => {
 }
 
 const toggleSecret = (record: TotpRecord) => {
-  if (secretQrStates.has(record.id)) hideSecretQr(record.id)
-  else void showSecretQr(record)
+  if (activeQrRecordId.value === record.id && secretQrStates.has(record.id)) {
+    hideSecretQr(record.id)
+  } else {
+    void showSecretQr(record)
+  }
 }
+
+const onKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && activeQrRecordId.value !== null) {
+    hideSecretQr()
+  }
+}
+
+const clearCopiedState = (key: string) => {
+  const timerId = copiedStates.get(key)
+  if (timerId !== undefined) {
+    clearTimeout(timerId)
+    copiedStates.delete(key)
+  }
+}
+
+const markCopied = (id: number, kind: 'secret' | 'code') => {
+  const key = `${id}:${kind}`
+  clearCopiedState(key)
+  copiedStates.set(
+    key,
+    setTimeout(() => {
+      copiedStates.delete(key)
+    }, 1500),
+  )
+}
+
+const isCopied = (id: number, kind: 'secret' | 'code') => copiedStates.has(`${id}:${kind}`)
 
 const copyValue = async (record: TotpRecord, kind: 'secret' | 'code') => {
   operationError.value = ''
@@ -201,7 +297,7 @@ const copyValue = async (record: TotpRecord, kind: 'secret' | 'code') => {
   try {
     const value = kind === 'secret' ? record.secret : getTotpState(record, Date.now()).code
     await navigator.clipboard.writeText(value)
-    if (active) operationMessage.value = kind === 'secret' ? '已复制密钥。' : '已复制验证码。'
+    if (active) markCopied(record.id, kind)
   } catch {
     if (active) operationError.value = '复制失败，请允许剪贴板访问或手动复制。'
   }
@@ -218,6 +314,8 @@ const deleteRecord = async (record: TotpRecord) => {
     if (!active) return
     records.value = records.value.filter((item) => item.id !== record.id)
     hideSecretQr(record.id)
+    clearCopiedState(`${record.id}:code`)
+    clearCopiedState(`${record.id}:secret`)
     operationMessage.value = '已删除密钥。'
   } catch {
     if (active) operationError.value = '密钥删除失败，请重试。'
@@ -271,7 +369,9 @@ onMounted(() => {
   void loadRecords()
   timer = setInterval(refreshTime, 1000)
   window.addEventListener('focus', refreshTime)
+  window.addEventListener('keydown', onKeydown)
   document.addEventListener('visibilitychange', refreshVisibleTime)
+  document.addEventListener('paste', onDocumentPaste)
 })
 
 onBeforeUnmount(() => {
@@ -279,9 +379,13 @@ onBeforeUnmount(() => {
   inputRevision += 1
   clearInterval(timer)
   window.removeEventListener('focus', refreshTime)
+  window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('visibilitychange', refreshVisibleTime)
+  document.removeEventListener('paste', onDocumentPaste)
   secretQrStates.clear()
   secretQrRequests.clear()
+  for (const timerId of copiedStates.values()) clearTimeout(timerId)
+  copiedStates.clear()
   for (const url of downloadCleanup.keys()) releaseDownload(url)
 })
 </script>
@@ -301,48 +405,120 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <form class="two-factor-form card" aria-label="新增密钥" novalidate @submit.prevent="addRecord">
+    <form
+      class="two-factor-form card"
+      aria-label="新增密钥"
+      novalidate
+      @paste="onPasteScreenshot"
+      @submit.prevent="addRecord"
+    >
       <h2>新增密钥</h2>
       <p id="two-factor-input-help" class="input-help">
         输入 Base32 密钥或 otpauth 链接，也可以读取二维码截图。
       </p>
-      <div class="field">
-        <label for="two-factor-input">密钥或 otpauth 链接</label>
-        <textarea
-          id="two-factor-input"
-          v-model="inputValue"
-          rows="3"
-          placeholder="JBSWY3DPEHPK3PXP 或 otpauth://totp/…"
-          autocomplete="off"
-          autocapitalize="off"
-          :spellcheck="false"
-          :disabled="saving"
-          :aria-invalid="Boolean(formError)"
-          aria-describedby="two-factor-input-help"
-          @input="inputChanged"
-          @change="readUriOnChange"
-        ></textarea>
-      </div>
-      <div class="import-actions">
+      <div class="input-tabs" role="tablist" aria-label="密钥导入方式">
         <button
+          id="two-factor-tab-manual"
           type="button"
-          class="button"
-          :disabled="saving || scanning || !inputValue.trim()"
-          @click="readInput"
+          role="tab"
+          class="tab-button"
+          :class="{ active: activeTab === 'manual' }"
+          :aria-selected="activeTab === 'manual'"
+          aria-controls="two-factor-panel-manual"
+          @click="activeTab = 'manual'"
         >
-          读取密钥
+          密钥或 otpauth 链接
         </button>
-        <div class="file-field">
-          <label for="two-factor-file">二维码截图</label>
+        <button
+          id="two-factor-tab-qr"
+          type="button"
+          role="tab"
+          class="tab-button"
+          :class="{ active: activeTab === 'qr' }"
+          :aria-selected="activeTab === 'qr'"
+          aria-controls="two-factor-panel-qr"
+          @click="activeTab = 'qr'"
+        >
+          二维码
+        </button>
+      </div>
+
+      <div
+        id="two-factor-panel-manual"
+        v-show="activeTab === 'manual'"
+        role="tabpanel"
+        aria-labelledby="two-factor-tab-manual"
+        class="tab-panel"
+      >
+        <div class="field">
+          <label for="two-factor-input">密钥或 otpauth 链接</label>
+          <textarea
+            id="two-factor-input"
+            v-model="inputValue"
+            rows="3"
+            placeholder="JBSWY3DPEHPK3PXP 或 otpauth://totp/…"
+            autocomplete="off"
+            autocapitalize="off"
+            :spellcheck="false"
+            :disabled="saving"
+            :aria-invalid="Boolean(formError)"
+            aria-describedby="two-factor-input-help"
+            @input="inputChanged"
+            @change="readUriOnChange"
+          ></textarea>
+        </div>
+        <div class="import-actions">
+          <button
+            type="button"
+            class="button"
+            :disabled="saving || scanning || !inputValue.trim()"
+            @click="readInput"
+          >
+            读取密钥
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="two-factor-panel-qr"
+        v-show="activeTab === 'qr'"
+        role="tabpanel"
+        aria-labelledby="two-factor-tab-qr"
+        class="tab-panel"
+      >
+        <div
+          class="qr-dropzone"
+          :class="{ dragging, disabled: saving }"
+          tabindex="0"
+          role="region"
+          aria-label="二维码上传区域"
+          @dragenter.prevent="onDragEnter"
+          @dragover.prevent="onDragOver"
+          @dragleave.prevent="onDragLeave"
+          @drop.prevent="onDropScreenshot"
+          @paste="onPasteScreenshot"
+        >
           <input
             id="two-factor-file"
+            class="sr-only-file"
             type="file"
             accept="image/png,image/jpeg,image/webp"
             :disabled="saving"
+            aria-label="二维码截图"
             @change="readScreenshot"
           />
+          <p class="dropzone-title">拖拽二维码图片到此处，或直接粘贴剪贴板图片</p>
+          <p class="dropzone-hint">支持 PNG、JPEG、WebP 格式</p>
+          <label
+            for="two-factor-file"
+            class="button dropzone-button"
+            :class="{ disabled: saving }"
+          >
+            选择二维码截图
+          </label>
         </div>
       </div>
+
       <p v-if="scanning" class="save-message" role="status">正在识别二维码…</p>
 
       <div class="field-grid">
@@ -454,7 +630,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
-      <p class="export-help">下载 JSON 文件到本地，文件包含明文密钥，请妥善保存。</p>
       <p v-if="operationError" class="error-message" role="alert">{{ operationError }}</p>
       <p v-if="operationMessage" class="save-message operation-message" role="status">
         {{ operationMessage }}
@@ -463,23 +638,23 @@ onBeforeUnmount(() => {
       <template v-else-if="!loadError">
         <ul v-if="displayedRecords.length" class="two-factor-list">
           <li
-            v-for="{ record, code, remaining, error, qr } in displayedRecords"
+            v-for="{ record, code, remaining, error } in displayedRecords"
             :key="record.id"
             class="two-factor-item card"
           >
             <div class="account-info">
               <p v-if="record.issuer" class="issuer">{{ record.issuer }}</p>
-              <h3>{{ record.label }}</h3>
-              <div class="secret-row">
+              <div class="account-heading">
+                <h3>{{ record.label }}</h3>
                 <button
                   type="button"
                   class="text-button"
-                  :aria-label="`${secretQrStates.has(record.id) ? '隐藏' : '查看'}密钥：${record.label}`"
-                  :aria-expanded="secretQrStates.has(record.id)"
+                  :aria-label="`查看密钥：${record.label}`"
+                  :aria-expanded="activeQrRecordId === record.id"
                   :aria-controls="`two-factor-qr-${record.id}`"
                   @click="toggleSecret(record)"
                 >
-                  {{ secretQrStates.has(record.id) ? '隐藏密钥' : '查看密钥' }}
+                  查看密钥
                 </button>
               </div>
               <p class="record-settings">
@@ -500,54 +675,23 @@ onBeforeUnmount(() => {
                 </div>
               </template>
             </div>
-            <div
-              v-if="qr"
-              :id="`two-factor-qr-${record.id}`"
-              class="secret-qr-panel"
-              :aria-busy="qr.status === 'loading'"
-            >
-              <p v-if="qr.status === 'loading'" class="save-message" role="status">
-                正在生成二维码…
-              </p>
-              <template v-else-if="qr.status === 'error'">
-                <p class="error-message" role="alert">{{ qr.message }}</p>
-                <button
-                  type="button"
-                  class="button"
-                  :aria-label="`重试生成二维码：${record.label}`"
-                  @click="showSecretQr(record)"
-                >
-                  重试生成二维码
-                </button>
-              </template>
-              <template v-else>
-                <img
-                  class="secret-qr"
-                  :src="qr.src"
-                  :alt="`${record.label} 的两步验证二维码`"
-                  width="288"
-                  height="288"
-                />
-                <p class="qr-help">使用验证器扫描此二维码添加账号。</p>
-              </template>
-            </div>
             <div class="record-actions">
               <button
                 type="button"
-                class="button copy-code"
+                class="text-button copy-code"
                 :disabled="Boolean(error)"
                 :aria-label="`复制验证码：${record.label}`"
                 @click="copyValue(record, 'code')"
               >
-                复制验证码
+                {{ isCopied(record.id, 'code') ? '已复制' : '复制验证码' }}
               </button>
               <button
                 type="button"
-                class="text-button"
+                class="text-button copy-secret"
                 :aria-label="`复制密钥：${record.label}`"
                 @click="copyValue(record, 'secret')"
               >
-                复制密钥
+                {{ isCopied(record.id, 'secret') ? '已复制' : '复制密钥' }}
               </button>
               <button
                 type="button"
@@ -564,8 +708,63 @@ onBeforeUnmount(() => {
         <p v-else class="empty-state card">还没有密钥，添加第一个账号吧。</p>
       </template>
     </section>
+
+    <div
+      v-if="activeQrRecord && activeQrState"
+      class="qr-modal-backdrop"
+      @click.self="hideSecretQr()"
+    >
+      <div
+        :id="`two-factor-qr-${activeQrRecord.id}`"
+        class="secret-qr-panel card"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`${activeQrRecord.label} 的密钥二维码`"
+        :aria-busy="activeQrState.status === 'loading'"
+      >
+        <div class="qr-modal-header">
+          <div class="qr-modal-title">
+            <p v-if="activeQrRecord.issuer" class="issuer">{{ activeQrRecord.issuer }}</p>
+            <h3>{{ activeQrRecord.label }}</h3>
+          </div>
+          <button
+            type="button"
+            class="text-button"
+            :aria-label="`隐藏密钥：${activeQrRecord.label}`"
+            @click="hideSecretQr(activeQrRecord.id)"
+          >
+            关闭
+          </button>
+        </div>
+        <p v-if="activeQrState.status === 'loading'" class="save-message" role="status">
+          正在生成二维码…
+        </p>
+        <template v-else-if="activeQrState.status === 'error'">
+          <p class="error-message" role="alert">{{ activeQrState.message }}</p>
+          <button
+            type="button"
+            class="button"
+            :aria-label="`重试生成二维码：${activeQrRecord.label}`"
+            @click="showSecretQr(activeQrRecord)"
+          >
+            重试生成二维码
+          </button>
+        </template>
+        <template v-else>
+          <img
+            class="secret-qr"
+            :src="activeQrState.src"
+            :alt="`${activeQrRecord.label} 的两步验证二维码`"
+            width="288"
+            height="288"
+          />
+          <p class="qr-help">使用验证器扫描此二维码添加账号。</p>
+        </template>
+      </div>
+    </div>
+
     <p class="footnote">
-      密钥仅保存在当前浏览器，未加密，不会上传服务器。清除浏览器数据会删除密钥。验证码依赖设备时间，请保持系统时间准确。
+      密钥仅保存在当前浏览器，未加密，不会上传服务器。清除浏览器数据会删除密钥。下载 JSON 文件到本地，文件包含明文密钥，请妥善保存。验证码依赖设备时间，请保持系统时间准确。
     </p>
   </main>
 </template>

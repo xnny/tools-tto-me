@@ -91,8 +91,11 @@ describe('two-factor view', () => {
     const wrapper = await renderView()
     expect(wrapper.text()).toContain('还没有密钥，添加第一个账号吧。')
     expect(wrapper.get<HTMLButtonElement>('.export-actions button').element.disabled).toBe(true)
-    expect(wrapper.text()).toContain('未加密')
-    expect(wrapper.text()).toContain('明文密钥')
+    expect(wrapper.find('.export-help').exists()).toBe(false)
+    expect(wrapper.get('.footnote').text()).toContain('未加密')
+    expect(wrapper.get('.footnote').text()).toContain(
+      '下载 JSON 文件到本地，文件包含明文密钥，请妥善保存。',
+    )
   })
 
   it('retains input and allows retry when loading browser storage fails', async () => {
@@ -229,31 +232,85 @@ describe('two-factor view', () => {
     expect(wrapper.text()).not.toContain('已识别二维码')
   })
 
-  it('shows a QR image on demand without plain text and still copies secrets and fresh codes', async () => {
+  it('switches between manual and QR tabs and supports drag-and-drop and clipboard paste', async () => {
+    vi.mocked(readTwoFactorQr).mockResolvedValue(uri)
+    const wrapper = await renderView()
+    const manualTab = wrapper.get('#two-factor-tab-manual')
+    const qrTab = wrapper.get('#two-factor-tab-qr')
+    expect(manualTab.attributes('aria-selected')).toBe('true')
+    expect(qrTab.attributes('aria-selected')).toBe('false')
+
+    await qrTab.trigger('click')
+    expect(manualTab.attributes('aria-selected')).toBe('false')
+    expect(qrTab.attributes('aria-selected')).toBe('true')
+
+    const droppedFile = new File(['dropped'], 'dropped.png', { type: 'image/png' })
+    const dropzone = wrapper.get('.qr-dropzone')
+    await dropzone.trigger('dragenter')
+    expect(dropzone.classes()).toContain('dragging')
+    await dropzone.trigger('drop', {
+      dataTransfer: { files: [droppedFile] },
+    })
+    await flushPromises()
+    expect(dropzone.classes()).not.toContain('dragging')
+    expect(readTwoFactorQr).toHaveBeenLastCalledWith(droppedFile)
+    expect(wrapper.get<HTMLInputElement>('#two-factor-label').element.value).toBe(record.label)
+
+    const pastedFile = new File(['pasted'], 'pasted.png', { type: 'image/png' })
+    await dropzone.trigger('paste', {
+      clipboardData: {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => pastedFile }],
+        files: [pastedFile],
+      },
+    })
+    await flushPromises()
+    expect(readTwoFactorQr).toHaveBeenLastCalledWith(pastedFile)
+  })
+
+  it('shows a QR image in a modal dialog on demand and briefly marks copy buttons as 已复制', async () => {
     vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
     const wrapper = await renderView()
     expect(wrapper.find('.secret-qr').exists()).toBe(false)
     expect(createTwoFactorQr).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain(record.secret)
-    await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
+    const viewButton = wrapper.get('.account-heading button[aria-label="查看密钥：alice@example.com"]')
+    expect(viewButton.classes()).toContain('text-button')
+    await viewButton.trigger('click')
     await flushPromises()
     expect(createTwoFactorQr).toHaveBeenCalledExactlyOnceWith(record)
+    const dialog = wrapper.get('.qr-modal-backdrop [role="dialog"].secret-qr-panel')
+    expect(dialog.attributes('aria-modal')).toBe('true')
     expect(wrapper.get('.secret-qr').attributes('src')).toBe(qrImage)
     expect(wrapper.get('.secret-qr').attributes('alt')).toBe('alice@example.com 的两步验证二维码')
     expect(wrapper.text()).not.toContain(record.secret)
     expect(wrapper.text()).toContain('使用验证器扫描此二维码添加账号')
     await wrapper.get('button[aria-label="隐藏密钥：alice@example.com"]').trigger('click')
     expect(wrapper.find('.secret-qr-panel').exists()).toBe(false)
-    await wrapper.get('button[aria-label="复制密钥：alice@example.com"]').trigger('click')
-    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(record.secret)
+
     const shownCode = wrapper.get('.otp-code').text()
+    const copySecretBtn = wrapper.get('button[aria-label="复制密钥：alice@example.com"]')
+    const copyCodeBtn = wrapper.get('.copy-code')
+    expect(copySecretBtn.classes()).toContain('text-button')
+    expect(copyCodeBtn.classes()).toContain('text-button')
+    expect(copySecretBtn.text()).toBe('复制密钥')
+    await copySecretBtn.trigger('click')
+    await flushPromises()
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(record.secret)
+    expect(copySecretBtn.text()).toBe('已复制')
+    expect(wrapper.find('.operation-message').exists()).toBe(false)
+
     vi.setSystemTime(60000)
-    await wrapper.get('.copy-code').trigger('click')
+    expect(copyCodeBtn.text()).toBe('复制验证码')
+    await copyCodeBtn.trigger('click')
     await flushPromises()
     const freshCode = getTotpState(record, 60000).code
     expect(freshCode).not.toBe(shownCode)
     expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(freshCode)
-    expect(wrapper.text()).toContain('已复制验证码')
+    expect(copyCodeBtn.text()).toBe('已复制')
+    expect(wrapper.find('.operation-message').exists()).toBe(false)
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(copySecretBtn.text()).toBe('复制密钥')
+    expect(copyCodeBtn.text()).toBe('复制验证码')
   })
 
   it('shows QR generation progress and lets the user retry a failure', async () => {
