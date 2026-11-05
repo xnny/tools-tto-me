@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 import { mount } from '@vue/test-utils'
 import App from '../App.vue'
@@ -31,5 +31,20 @@ describe('App', () => {
     await wrapper.get('.home-link').trigger('click')
     await new Promise((resolve) => setTimeout(resolve))
     expect(wrapper.find('h1').text()).toBe('简单好用的在线小工具')
+  })
+
+  it('opens the usage guide from the footer', async () => {
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(App, { global: { plugins: [router] } })
+    const link = wrapper.get('.site-footer a')
+    expect(link.text()).toBe('使用说明')
+    expect(link.attributes('href')).toBe('/guide')
+
+    await link.trigger('click')
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('Guide'))
+    expect(document.title).toBe('使用说明 · TTO Tools')
+    expect(wrapper.get('h1').text()).toBe('使用说明')
   })
 })

@@ -41,6 +41,12 @@ const router = createRouter({
       meta: { title: '两步验证' },
     },
     {
+      path: '/guide',
+      name: 'Guide',
+      component: () => import('@/views/GuideView.vue'),
+      meta: { title: '使用说明' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('@/views/NotFoundView.vue'),

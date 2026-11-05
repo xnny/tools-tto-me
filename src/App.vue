@@ -32,7 +32,10 @@ const year = new Date().getFullYear()
       <RouterView />
     </div>
 
-    <footer class="site-footer">© {{ year }} tools.tto.me</footer>
+    <footer class="site-footer">
+      <span>© {{ year }} tools.tto.me</span>
+      <RouterLink to="/guide" class="footer-link">使用说明</RouterLink>
+    </footer>
   </div>
 </template>
 
@@ -116,10 +119,19 @@ const year = new Date().getFullYear()
 }
 
 .site-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
   padding: 24px;
   color: #a7b1bd;
   font-size: 12px;
   text-align: center;
+}
+
+.footer-link:hover {
+  color: var(--color-primary);
 }
 
 @media (max-width: 520px) {
