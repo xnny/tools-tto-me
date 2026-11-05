@@ -72,10 +72,11 @@ test('persists accounts, shows RFC codes across a period boundary, and copies an
   await page.locator('#two-factor-digits').selectOption('8')
   await page.getByRole('button', { name: '添加密钥', exact: true }).click()
   await expect(page.locator('.otp-code')).toHaveText('07081804')
-  await expect(page.locator('.secret-value')).toHaveCount(0)
+  await expect(page.locator('.secret-qr')).toHaveCount(0)
+  await expect(page.locator('.two-factor-item')).not.toContainText(secret)
   await page.reload()
   await expect(page.locator('.otp-code')).toHaveText('07081804')
-  await expect(page.locator('.secret-value')).toHaveCount(0)
+  await expect(page.locator('.secret-qr')).toHaveCount(0)
   expect(await readStoredRecords(page)).toEqual([
     expect.objectContaining({
       issuer: 'Example',
@@ -88,11 +89,13 @@ test('persists accounts, shows RFC codes across a period boundary, and copies an
   ])
 
   await page.getByRole('button', { name: '查看密钥：alice@example.com', exact: true }).click()
-  await expect(page.locator('.secret-value')).toHaveText(secret)
+  await expect(page.getByRole('img', { name: 'alice@example.com 的两步验证二维码' })).toBeVisible()
+  await expect(page.locator('.secret-qr')).toHaveAttribute('src', /^data:image\/png;base64,/)
+  await expect(page.locator('.two-factor-item')).not.toContainText(secret)
   await page.getByRole('button', { name: '复制密钥：alice@example.com', exact: true }).click()
   expect(await page.evaluate(() => sessionStorage.getItem('test-copied-text'))).toBe(secret)
   await page.getByRole('button', { name: '隐藏密钥：alice@example.com', exact: true }).click()
-  await expect(page.locator('.secret-value')).toHaveCount(0)
+  await expect(page.locator('.secret-qr')).toHaveCount(0)
 
   await page.clock.setFixedTime(1_111_111_111_000)
   await page.getByRole('button', { name: '复制验证码：alice@example.com', exact: true }).click()
@@ -110,7 +113,7 @@ test('persists accounts, shows RFC codes across a period boundary, and copies an
   expect(await readStoredRecords(page)).toEqual([])
 })
 
-test('decodes a real screenshot using the worker fallback, preserves its parameters, and downloads a complete JSON backup', async ({
+test('round-trips a real QR image through the worker decoder and downloads a complete JSON backup', async ({
   page,
 }) => {
   // Exercise the bundled decoder even in browsers with native BarcodeDetector support.
@@ -133,6 +136,29 @@ test('decodes a real screenshot using the worker fallback, preserves its paramet
   expect(await readStoredRecords(page)).toEqual([
     expect.objectContaining({ secret, algorithm: 'SHA256', digits: 8, period: 45 }),
   ])
+  const storedBeforeRoundTrip = await readStoredRecords(page)
+  await page.getByRole('button', { name: '查看密钥：alice@example.com', exact: true }).click()
+  const generatedQr = page.getByRole('img', { name: 'alice@example.com 的两步验证二维码' })
+  await expect(generatedQr).toBeVisible()
+  await expect(generatedQr).toHaveAttribute('src', /^data:image\/png;base64,/)
+  await expect(page.locator('.two-factor-item')).not.toContainText(secret)
+  const renderedQrScreenshot = await generatedQr.screenshot()
+  await page.locator('#two-factor-file').setInputFiles({
+    name: 'generated-account-qr.png',
+    mimeType: 'image/png',
+    buffer: renderedQrScreenshot,
+  })
+  await expect(page.locator('#two-factor-input')).toHaveValue(secret)
+  await expect(page.locator('#two-factor-label')).toHaveValue('alice@example.com')
+  await expect(page.locator('#two-factor-issuer')).toHaveValue('Example')
+  await expect(page.locator('#two-factor-algorithm')).toHaveValue('SHA256')
+  await expect(page.locator('#two-factor-digits')).toHaveValue('8')
+  await expect(page.locator('#two-factor-period')).toHaveValue('45')
+  await expect(page.locator('.two-factor-item')).toHaveCount(1)
+  expect(await readStoredRecords(page)).toEqual(storedBeforeRoundTrip)
+  await page.reload()
+  await expect(page.locator('.two-factor-item')).toHaveCount(1)
+  await expect(page.locator('.secret-qr')).toHaveCount(0)
   await addAccount(page, 'second account')
   await expect(page.locator('.two-factor-item')).toHaveCount(2)
 
@@ -219,7 +245,7 @@ test('shows a retryable storage error instead of an empty list when IndexedDB is
   await expect(page.locator('#two-factor-input')).toHaveValue(secret)
 })
 
-test('keeps long account names, secrets and controls within a narrow viewport', async ({
+test('keeps long account names, generated QR images and controls within a narrow viewport', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 })
@@ -228,7 +254,8 @@ test('keeps long account names, secrets and controls within a narrow viewport', 
   const label = 'very-long-account-name-for-small-screen@example.com'
   await addAccount(page, label)
   await page.getByRole('button', { name: `查看密钥：${label}`, exact: true }).click()
-  await expect(page.locator('.secret-value')).toHaveText(secret)
+  await expect(page.getByRole('img', { name: `${label} 的两步验证二维码` })).toBeVisible()
+  await expect(page.locator('.two-factor-item')).not.toContainText(secret)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375)
   await expect(page.getByRole('button', { name: '导出密钥', exact: true })).toBeEnabled()
 })

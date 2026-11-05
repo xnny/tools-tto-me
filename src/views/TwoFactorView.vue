@@ -13,7 +13,7 @@ import {
   getTwoFactorRecords,
   removeTwoFactorRecord,
 } from '@/utils/twoFactorStorage'
-import { readTwoFactorQr } from '@/utils/twoFactorQr'
+import { createTwoFactorQr, readTwoFactorQr } from '@/utils/twoFactorQr'
 
 const defaultForm = (): TotpConfig => ({
   issuer: '',
@@ -35,15 +35,29 @@ const formError = ref('')
 const operationError = ref('')
 const formMessage = ref('')
 const operationMessage = ref('')
-const revealedIds = ref(new Set<number>())
+type SecretQrState =
+  { status: 'loading' } | { status: 'ready'; src: string } | { status: 'error'; message: string }
+const secretQrStates = reactive(new Map<number, SecretQrState>())
+const secretQrRequests = new Map<number, symbol>()
 const now = ref(Date.now())
 const storageBusy = computed(() => loading.value || saving.value || Boolean(loadError.value))
 const displayedRecords = computed(() =>
   records.value.map((record) => {
     try {
-      return { record, ...getTotpState(record, now.value), error: '' }
+      return {
+        record,
+        ...getTotpState(record, now.value),
+        error: '',
+        qr: secretQrStates.get(record.id),
+      }
     } catch {
-      return { record, code: '', remaining: 0, error: '无法生成验证码，请删除后重新添加。' }
+      return {
+        record,
+        code: '',
+        remaining: 0,
+        error: '无法生成验证码，请删除后重新添加。',
+        qr: secretQrStates.get(record.id),
+      }
     }
   }),
 )
@@ -152,9 +166,33 @@ const addRecord = async () => {
   }
 }
 
-const toggleSecret = (id: number) => {
-  if (revealedIds.value.has(id)) revealedIds.value.delete(id)
-  else revealedIds.value.add(id)
+const hideSecretQr = (id: number) => {
+  secretQrRequests.delete(id)
+  secretQrStates.delete(id)
+}
+
+const showSecretQr = async (record: TotpRecord) => {
+  const request = Symbol()
+  secretQrRequests.set(record.id, request)
+  secretQrStates.set(record.id, { status: 'loading' })
+  try {
+    const src = await createTwoFactorQr(record)
+    if (active && secretQrRequests.get(record.id) === request) {
+      secretQrStates.set(record.id, { status: 'ready', src })
+    }
+  } catch (error) {
+    if (active && secretQrRequests.get(record.id) === request) {
+      secretQrStates.set(record.id, {
+        status: 'error',
+        message: errorMessage(error, '二维码生成失败，请重试。'),
+      })
+    }
+  }
+}
+
+const toggleSecret = (record: TotpRecord) => {
+  if (secretQrStates.has(record.id)) hideSecretQr(record.id)
+  else void showSecretQr(record)
 }
 
 const copyValue = async (record: TotpRecord, kind: 'secret' | 'code') => {
@@ -179,7 +217,7 @@ const deleteRecord = async (record: TotpRecord) => {
     await removeTwoFactorRecord(record.id)
     if (!active) return
     records.value = records.value.filter((item) => item.id !== record.id)
-    revealedIds.value.delete(record.id)
+    hideSecretQr(record.id)
     operationMessage.value = '已删除密钥。'
   } catch {
     if (active) operationError.value = '密钥删除失败，请重试。'
@@ -242,6 +280,8 @@ onBeforeUnmount(() => {
   clearInterval(timer)
   window.removeEventListener('focus', refreshTime)
   document.removeEventListener('visibilitychange', refreshVisibleTime)
+  secretQrStates.clear()
+  secretQrRequests.clear()
   for (const url of downloadCleanup.keys()) releaseDownload(url)
 })
 </script>
@@ -423,7 +463,7 @@ onBeforeUnmount(() => {
       <template v-else-if="!loadError">
         <ul v-if="displayedRecords.length" class="two-factor-list">
           <li
-            v-for="{ record, code, remaining, error } in displayedRecords"
+            v-for="{ record, code, remaining, error, qr } in displayedRecords"
             :key="record.id"
             class="two-factor-item card"
           >
@@ -431,17 +471,15 @@ onBeforeUnmount(() => {
               <p v-if="record.issuer" class="issuer">{{ record.issuer }}</p>
               <h3>{{ record.label }}</h3>
               <div class="secret-row">
-                <span v-if="revealedIds.has(record.id)" class="secret-value">{{
-                  record.secret
-                }}</span>
                 <button
                   type="button"
                   class="text-button"
-                  :aria-label="`${revealedIds.has(record.id) ? '隐藏' : '查看'}密钥：${record.label}`"
-                  :aria-pressed="revealedIds.has(record.id)"
-                  @click="toggleSecret(record.id)"
+                  :aria-label="`${secretQrStates.has(record.id) ? '隐藏' : '查看'}密钥：${record.label}`"
+                  :aria-expanded="secretQrStates.has(record.id)"
+                  :aria-controls="`two-factor-qr-${record.id}`"
+                  @click="toggleSecret(record)"
                 >
-                  {{ revealedIds.has(record.id) ? '隐藏密钥' : '查看密钥' }}
+                  {{ secretQrStates.has(record.id) ? '隐藏密钥' : '查看密钥' }}
                 </button>
               </div>
               <p class="record-settings">
@@ -460,6 +498,37 @@ onBeforeUnmount(() => {
                   ></progress
                   ><span>{{ remaining }} 秒后刷新</span>
                 </div>
+              </template>
+            </div>
+            <div
+              v-if="qr"
+              :id="`two-factor-qr-${record.id}`"
+              class="secret-qr-panel"
+              :aria-busy="qr.status === 'loading'"
+            >
+              <p v-if="qr.status === 'loading'" class="save-message" role="status">
+                正在生成二维码…
+              </p>
+              <template v-else-if="qr.status === 'error'">
+                <p class="error-message" role="alert">{{ qr.message }}</p>
+                <button
+                  type="button"
+                  class="button"
+                  :aria-label="`重试生成二维码：${record.label}`"
+                  @click="showSecretQr(record)"
+                >
+                  重试生成二维码
+                </button>
+              </template>
+              <template v-else>
+                <img
+                  class="secret-qr"
+                  :src="qr.src"
+                  :alt="`${record.label} 的两步验证二维码`"
+                  width="288"
+                  height="288"
+                />
+                <p class="qr-help">使用验证器扫描此二维码添加账号。</p>
               </template>
             </div>
             <div class="record-actions">

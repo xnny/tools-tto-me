@@ -7,14 +7,17 @@ import {
   getTwoFactorRecords,
   removeTwoFactorRecord,
 } from '../utils/twoFactorStorage'
-import { readTwoFactorQr } from '../utils/twoFactorQr'
+import { createTwoFactorQr, readTwoFactorQr } from '../utils/twoFactorQr'
 
 vi.mock('../utils/twoFactorStorage', () => ({
   addTwoFactorRecord: vi.fn<typeof addTwoFactorRecord>(),
   getTwoFactorRecords: vi.fn<typeof getTwoFactorRecords>(),
   removeTwoFactorRecord: vi.fn<typeof removeTwoFactorRecord>(),
 }))
-vi.mock('../utils/twoFactorQr', () => ({ readTwoFactorQr: vi.fn<typeof readTwoFactorQr>() }))
+vi.mock('../utils/twoFactorQr', () => ({
+  createTwoFactorQr: vi.fn<typeof createTwoFactorQr>(),
+  readTwoFactorQr: vi.fn<typeof readTwoFactorQr>(),
+}))
 
 enableAutoUnmount(afterEach)
 
@@ -31,6 +34,7 @@ const record: TotpRecord = {
 const uri =
   'otpauth://totp/Example:alice%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example&algorithm=SHA256&digits=8&period=60'
 const OriginalURL = URL
+const qrImage = 'data:image/png;base64,cXItcG5n'
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -43,6 +47,7 @@ beforeEach(() => {
     createdAt: Date.now(),
   }))
   vi.mocked(removeTwoFactorRecord).mockResolvedValue()
+  vi.mocked(createTwoFactorQr).mockResolvedValue(qrImage)
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   vi.stubGlobal('navigator', {
     clipboard: { writeText: vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined) },
@@ -224,14 +229,21 @@ describe('two-factor view', () => {
     expect(wrapper.text()).not.toContain('已识别二维码')
   })
 
-  it('hides secrets by default and copies a newly calculated code across a period boundary', async () => {
+  it('shows a QR image on demand without plain text and still copies secrets and fresh codes', async () => {
     vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
     const wrapper = await renderView()
-    expect(wrapper.find('.secret-value').exists()).toBe(false)
+    expect(wrapper.find('.secret-qr').exists()).toBe(false)
+    expect(createTwoFactorQr).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain(record.secret)
     await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
-    expect(wrapper.get('.secret-value').text()).toBe(record.secret)
+    await flushPromises()
+    expect(createTwoFactorQr).toHaveBeenCalledExactlyOnceWith(record)
+    expect(wrapper.get('.secret-qr').attributes('src')).toBe(qrImage)
+    expect(wrapper.get('.secret-qr').attributes('alt')).toBe('alice@example.com 的两步验证二维码')
+    expect(wrapper.text()).not.toContain(record.secret)
+    expect(wrapper.text()).toContain('使用验证器扫描此二维码添加账号')
     await wrapper.get('button[aria-label="隐藏密钥：alice@example.com"]').trigger('click')
-    expect(wrapper.find('.secret-value').exists()).toBe(false)
+    expect(wrapper.find('.secret-qr-panel').exists()).toBe(false)
     await wrapper.get('button[aria-label="复制密钥：alice@example.com"]').trigger('click')
     expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(record.secret)
     const shownCode = wrapper.get('.otp-code').text()
@@ -242,6 +254,86 @@ describe('two-factor view', () => {
     expect(freshCode).not.toBe(shownCode)
     expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(freshCode)
     expect(wrapper.text()).toContain('已复制验证码')
+  })
+
+  it('shows QR generation progress and lets the user retry a failure', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    let rejectQr!: (error: Error) => void
+    vi.mocked(createTwoFactorQr).mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectQr = reject
+      }),
+    )
+    const wrapper = await renderView()
+    await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
+    expect(wrapper.get('.secret-qr-panel').attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('.secret-qr-panel [role="status"]').text()).toBe('正在生成二维码…')
+    const failureMessage = '无法生成二维码，请重试；账号信息过长时可使用 JSON 导出。'
+    rejectQr(new Error(failureMessage))
+    await flushPromises()
+    expect(wrapper.get('.secret-qr-panel [role="alert"]').text()).toBe(failureMessage)
+    expect(wrapper.text()).not.toContain(record.secret)
+    await wrapper.get('button[aria-label="重试生成二维码：alice@example.com"]').trigger('click')
+    await flushPromises()
+    expect(createTwoFactorQr).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.secret-qr').attributes('src')).toBe(qrImage)
+    expect(wrapper.find('.secret-qr-panel [role="alert"]').exists()).toBe(false)
+  })
+
+  it('ignores a late QR result after hiding and generates a new image when reopened', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    let resolveQr!: (src: string) => void
+    vi.mocked(createTwoFactorQr).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveQr = resolve
+      }),
+    )
+    const wrapper = await renderView()
+    await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
+    await wrapper.get('button[aria-label="隐藏密钥：alice@example.com"]').trigger('click')
+    resolveQr('data:image/png;base64,b2xk')
+    await flushPromises()
+    expect(wrapper.find('.secret-qr-panel').exists()).toBe(false)
+    await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
+    await flushPromises()
+    expect(createTwoFactorQr).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.secret-qr').attributes('src')).toBe(qrImage)
+  })
+
+  it('does not restore a QR panel after the account is deleted', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    let resolveQr!: (src: string) => void
+    vi.mocked(createTwoFactorQr).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveQr = resolve
+      }),
+    )
+    const wrapper = await renderView()
+    await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
+    await wrapper.get('.delete-button').trigger('click')
+    await flushPromises()
+    resolveQr(qrImage)
+    await flushPromises()
+    expect(wrapper.find('.two-factor-item').exists()).toBe(false)
+    expect(wrapper.find('.secret-qr-panel').exists()).toBe(false)
+  })
+
+  it('clears QR state on unmount and ignores the pending result', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    let resolveQr!: (src: string) => void
+    vi.mocked(createTwoFactorQr).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveQr = resolve
+      }),
+    )
+    const wrapper = await renderView()
+    await wrapper.get('button[aria-label="查看密钥：alice@example.com"]').trigger('click')
+    wrapper.unmount()
+    resolveQr(qrImage)
+    await flushPromises()
+    const reopened = await renderView()
+    expect(reopened.find('.secret-qr-panel').exists()).toBe(false)
+    expect(createTwoFactorQr).toHaveBeenCalledTimes(1)
   })
 
   it('reports clipboard failures without changing records', async () => {

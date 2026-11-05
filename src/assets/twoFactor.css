@@ -259,11 +259,25 @@ select:disabled {
   gap: 6px;
   margin-top: 9px;
 }
-.secret-value {
-  font-family: var(--font-mono);
-  font-size: 12px;
+.secret-qr-panel {
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  text-align: center;
+}
+.secret-qr {
+  display: block;
+  width: 288px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.qr-help {
+  margin: 12px 0 0;
   color: var(--color-text-soft);
-  overflow-wrap: anywhere;
+  font-size: 12px;
 }
 .record-settings {
   margin: 5px 0 0;
