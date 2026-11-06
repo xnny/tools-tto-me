@@ -95,10 +95,9 @@ describe('two-factor view', () => {
     expect(wrapper.text()).toContain('还没有密钥，添加第一个账号吧。')
     expect(wrapper.get<HTMLButtonElement>('.export-actions button').element.disabled).toBe(true)
     expect(wrapper.find('.export-help').exists()).toBe(false)
-    expect(wrapper.get('.footnote').text()).toContain('未加密')
-    expect(wrapper.get('.footnote').text()).toContain(
-      '下载 JSON 文件到本地，文件包含明文密钥，请妥善保存。',
-    )
+    expect(wrapper.find('.subtitle').exists()).toBe(false)
+    expect(wrapper.find('.input-help').exists()).toBe(false)
+    expect(wrapper.find('.footnote').exists()).toBe(false)
     // Vue's development renderer may schedule a one-off DevTools timeout on first mount.
     expect(interval).not.toHaveBeenCalled()
     window.dispatchEvent(new Event('focus'))

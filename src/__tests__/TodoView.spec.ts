@@ -54,7 +54,8 @@ describe('todo composer', () => {
     expect(addTodos).not.toHaveBeenCalled()
     expect(wrapper.find('.todo-list-section').exists()).toBe(false)
     expect(wrapper.find('.page-heading .subtitle').exists()).toBe(false)
-    expect(wrapper.get('.todo-page > :last-child').classes()).toContain('footnote')
+    expect(wrapper.find('.input-help').exists()).toBe(false)
+    expect(wrapper.find('.footnote').exists()).toBe(false)
   })
 
   it('restores a draft and removes it when the input is cleared', async () => {

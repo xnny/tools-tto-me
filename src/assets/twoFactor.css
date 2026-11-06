@@ -30,12 +30,6 @@ h3 {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.subtitle,
-.input-help {
-  margin: 8px 0 0;
-  color: var(--color-text-soft);
-  font-size: 14px;
-}
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -456,11 +450,6 @@ progress::-moz-progress-bar {
 }
 .storage-error .error-message {
   margin-top: 0;
-}
-.footnote {
-  margin: 20px 0 0;
-  color: var(--color-text-soft);
-  font-size: 12px;
 }
 @media (max-width: 700px) {
   .two-factor-page {

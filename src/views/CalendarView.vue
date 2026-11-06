@@ -69,7 +69,6 @@ function selectHoliday() {
       <div>
         <p class="eyebrow">CALENDAR</p>
         <h1>日历</h1>
-        <p class="subtitle">查看日期、农历与节日</p>
       </div>
       <span class="heading-date">{{ today.year }} 年 {{ today.month }} 月</span>
     </div>
@@ -144,7 +143,6 @@ function selectHoliday() {
         </aside>
       </div>
     </section>
-    <p class="footnote">基督教节日按西方教会常用公历日期标注；节假日及调休安排以官方公布为准</p>
   </main>
 </template>
 
@@ -153,7 +151,6 @@ function selectHoliday() {
 .page-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 28px; }
 .eyebrow { margin: 0 0 8px; color: #3c80d9; font-size: 11px; font-weight: 700; letter-spacing: .18em; }
 h1 { margin: 0; color: #1f2d41; font-size: 32px; line-height: 1.2; }
-.subtitle { margin: 9px 0 0; color: #8b96a5; font-size: 14px; }
 .heading-date { padding-bottom: 3px; color: #a2acb9; font-size: 13px; }
 .calendar-card { overflow: hidden; background: #fff; border: 1px solid #e7edf4; border-radius: 12px; box-shadow: 0 14px 45px rgba(39, 66, 100, .08); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 19px 22px; border-bottom: 1px solid #edf1f6; }
@@ -197,7 +194,6 @@ select { appearance: none; height: 36px; min-width: 100px; padding: 0 30px 0 12p
 .almanac-row { display: flex; gap: 9px; align-items: flex-start; color: #7c8da1; font-size: 12px; line-height: 1.8; }
 .almanac-tag { flex: 0 0 24px; height: 24px; border-radius: 5px; color: white; line-height: 24px; text-align: center; }
 .good { background: #83b59a; } .bad { background: #d7a4a0; }
-.footnote { margin: 14px 3px 0; color: #a7b1bd; font-size: 12px; text-align: right; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 700px) { .calendar-page { padding: 30px 12px 48px; } .heading-date { display: none; } .toolbar { align-items: flex-start; padding: 14px; } .date-controls { flex-wrap: wrap; gap: 6px; } .calendar-content { grid-template-columns: 1fr; } .month-view { padding: 10px 8px 16px; } .day-cell { height: 59px; } .day-number { font-size: 18px; } .day-detail { padding: 22px; } .almanac { max-width: 400px; margin: 20px auto 0; } }
 @media (max-width: 380px) { select { min-width: 85px; padding-left: 8px; } .today-button { padding: 0 9px; } .arrow { width: 22px; } }

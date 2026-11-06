@@ -398,7 +398,6 @@ onBeforeUnmount(() => {
     <header class="page-heading">
       <p class="eyebrow">TWO-FACTOR AUTHENTICATION</p>
       <h1>两步验证</h1>
-      <p class="subtitle">保存账号密钥，随时获取动态验证码。</p>
     </header>
 
     <div v-if="loadError" class="storage-error card">
@@ -416,9 +415,6 @@ onBeforeUnmount(() => {
       @submit.prevent="addRecord"
     >
       <h2>新增密钥</h2>
-      <p id="two-factor-input-help" class="input-help">
-        输入 Base32 密钥或 otpauth 链接，也可以读取二维码截图。
-      </p>
       <div class="input-tabs" role="tablist" aria-label="密钥导入方式">
         <button
           id="two-factor-tab-manual"
@@ -465,7 +461,6 @@ onBeforeUnmount(() => {
             :spellcheck="false"
             :disabled="saving"
             :aria-invalid="Boolean(formError)"
-            aria-describedby="two-factor-input-help"
             @input="inputChanged"
             @change="readUriOnChange"
           ></textarea>
@@ -765,10 +760,6 @@ onBeforeUnmount(() => {
         </template>
       </div>
     </div>
-
-    <p class="footnote">
-      密钥仅保存在当前浏览器，未加密，不会上传服务器。清除浏览器数据会删除密钥。下载 JSON 文件到本地，文件包含明文密钥，请妥善保存。验证码依赖设备时间，请保持系统时间准确。
-    </p>
   </main>
 </template>
 

@@ -46,5 +46,8 @@ describe('App', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('Guide'))
     expect(document.title).toBe('使用说明 · TTO Tools')
     expect(wrapper.get('h1').text()).toBe('使用说明')
+    expect(wrapper.text()).toContain('基督教节日按西方教会常用公历日期标注')
+    expect(wrapper.text()).toContain('取消后重新开启自动删除会重新计时')
+    expect(wrapper.text()).toContain('选择、拖拽或粘贴 PNG、JPEG、WebP')
   })
 })

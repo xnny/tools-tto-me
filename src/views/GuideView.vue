@@ -28,7 +28,7 @@ import { RouterLink } from 'vue-router'
       </div>
       <p>
         查看公历、农历、节气、节日、每日宜忌和日期详情，支持切换年月、节日以及返回今天。可查看的年份为
-        1901 至 2099 年。节假日及调休安排以官方公布为准。
+        1901 至 2099 年。基督教节日按西方教会常用公历日期标注；节假日及调休安排以官方公布为准。
       </p>
     </section>
 
@@ -59,7 +59,7 @@ import { RouterLink } from 'vue-router'
         </li>
         <li>
           在待办列表中可以筛选、编辑、完成和删除事项。完成满 7
-          天后，下次打开或刷新待办页面时会自动删除；也可逐条设置保留。
+          天后，下次打开或刷新待办页面时会自动删除；也可逐条设置保留，取消后重新开启自动删除会重新计时。
         </li>
       </ul>
     </section>
@@ -71,7 +71,8 @@ import { RouterLink } from 'vue-router'
       </div>
       <ul>
         <li>
-          输入 Base32 密钥或 TOTP 类型的 otpauth 链接，也可以导入 PNG、JPEG、WebP 二维码截图。
+          输入 Base32 密钥或 TOTP 类型的 otpauth 链接，也可以选择、拖拽或粘贴 PNG、JPEG、WebP
+          二维码截图。
         </li>
         <li>
           支持设置 SHA1、SHA256、SHA512 算法，6 位或 8

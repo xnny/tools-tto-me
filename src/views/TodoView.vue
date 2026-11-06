@@ -146,10 +146,6 @@ onBeforeUnmount(() => {
 
     <form class="composer card" aria-label="添加待办" @submit.prevent="submitTodos">
       <label for="todo-input" class="section-title">新增待办</label>
-      <p id="todo-input-help" class="input-help">
-        一行一条；用一对 <code>```</code> 包住正文，可添加一条多行待办。按
-        <code>Command + Return</code>（Win/Linux 按 <code>Ctrl + Enter</code>）可快速提交。
-      </p>
       <textarea
         id="todo-input"
         v-model="inputValue"
@@ -157,7 +153,7 @@ onBeforeUnmount(() => {
         :placeholder="inputExample"
         :disabled="saving"
         :aria-invalid="Boolean(addError)"
-        :aria-describedby="addError ? 'todo-input-help todo-add-error' : 'todo-input-help'"
+        :aria-describedby="addError ? 'todo-add-error' : undefined"
         @input="handleInput"
         @keydown="handleKeydown"
       ></textarea>
@@ -178,8 +174,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </form>
-
-    <p class="footnote">记录要做的事。停止输入 1 秒后自动保存草稿，点击添加后成为正式待办。</p>
   </main>
 </template>
 

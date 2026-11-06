@@ -155,7 +155,6 @@ useVisibleInterval(() => {
       <div>
         <p class="eyebrow">TIMESTAMP</p>
         <h1>时间戳转换</h1>
-        <p class="subtitle">一行一个：YYYY-MM-DD HH:mm:ss 或 时间戳（秒），时区：{{ timezoneLabel }}</p>
       </div>
     </div>
 
@@ -249,12 +248,6 @@ h1 {
   color: var(--color-text);
   font-size: 32px;
   line-height: 1.2;
-}
-
-.subtitle {
-  margin: 9px 0 0;
-  color: var(--color-text-muted);
-  font-size: 14px;
 }
 
 .now-card,

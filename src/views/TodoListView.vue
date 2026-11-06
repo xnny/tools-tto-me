@@ -338,10 +338,6 @@ onMounted(() => {
         <p v-else class="empty-state card">{{ emptyMessage }}</p>
       </template>
     </section>
-
-    <p class="footnote">
-      完成满 7 天后，在下次打开或刷新页面时自动删除；取消后重新开启自动删除会重新计时。
-    </p>
   </main>
 </template>
 
