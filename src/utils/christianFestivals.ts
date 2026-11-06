@@ -35,7 +35,7 @@ function getEaster(year: number): Temporal.PlainDate {
   return Temporal.PlainDate.from({ year, month, day })
 }
 
-/** Additional Christian observances; Christmas and All Saints are already fixed solar festivals. */
+/** Additional Christian observances; Christmas and All Saints use fixed-date calendar entries. */
 export function getChristianFestival(date: Temporal.PlainDate): string | undefined {
   if (date.month === 1 && date.day === 6) return '主显节'
 

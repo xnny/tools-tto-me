@@ -135,15 +135,8 @@ describe('calendar', () => {
   })
 
   it.each([
-    { date: '2026-10-31', label: '万圣节前夜' },
-    { date: '2026-11-01', label: '万圣节' },
     { date: '2026-12-25', label: '圣诞节' },
-    { date: '2026-01-06', label: '主显节' },
-    { date: '2026-04-03', label: '耶稣受难日' },
     { date: '2027-03-28', label: '复活节' },
-    { date: '2026-05-14', label: '耶稣升天节' },
-    { date: '2026-05-24', label: '圣灵降临节' },
-    { date: '2025-06-15', label: '父亲节 · 三一主日' },
     { date: '2026-02-10', label: '北方小年' },
     { date: '2026-02-11', label: '南方小年' },
     { date: '2026-04-04', label: '寒食节' },
@@ -153,6 +146,7 @@ describe('calendar', () => {
     const wrapper = mount(CalendarView)
 
     expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe(label)
+    expect(wrapper.get('.day-cell.selected').classes()).toContain('festival')
     for (const name of label.split(' · ')) {
       expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(name)
     }
@@ -183,6 +177,17 @@ describe('calendar', () => {
     { date: '2026-05-12', label: '国际护士节', detail: '国际护士节' },
     { date: '2026-09-10', label: '教师节', detail: '教师节' },
     { date: '2026-03-12', label: '植树节', detail: '植树节' },
+    { date: '2026-01-06', label: '主显节', detail: '二九第8天 · 主显节' },
+    { date: '2026-03-29', label: '棕枝主日', detail: '棕枝主日' },
+    { date: '2026-04-02', label: '濯足节', detail: '濯足节' },
+    { date: '2026-04-03', label: '耶稣受难日', detail: '耶稣受难日' },
+    { date: '2026-05-14', label: '耶稣升天节', detail: '耶稣升天节' },
+    { date: '2026-05-24', label: '圣灵降临节', detail: '圣灵降临节' },
+    { date: '2026-05-31', label: '三一主日', detail: '三一主日' },
+    { date: '2026-10-31', label: '万圣节前夜', detail: '万圣节前夜' },
+    { date: '2026-11-01', label: '万圣节', detail: '万圣节' },
+    { date: '2026-11-26', label: '感恩节', detail: '感恩节' },
+    { date: '2026-12-24', label: '平安夜', detail: '一九第3天 · 平安夜' },
     { date: '2026-11-09', label: '寒衣节', detail: '寒衣节' },
     { date: '2026-11-23', label: '下元节', detail: '下元节' },
     { date: '2026-11-29', label: '将临期第一主日', detail: '将临期第一主日' },
@@ -212,6 +217,8 @@ describe('calendar', () => {
     { date: '2003-11-08', label: '立冬', detail: '记者节 · 下元节' },
     { date: '2019-11-08', label: '立冬', detail: '记者节' },
     { date: '2019-05-12', label: '母亲节', detail: '国际护士节' },
+    { date: '2025-06-15', label: '父亲节', detail: '三一主日' },
+    { date: '2026-02-18', label: '雨水', detail: '七九第6天 · 圣灰星期三' },
   ])(
     'keeps low-priority annotations in the details when $label is present',
     ({ date, label, detail }) => {

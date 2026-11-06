@@ -5,9 +5,6 @@ import { getChristianFestival } from './christianFestivals'
 const extraSolarFestivals: Record<string, string> = {
   '2-14': '情人节',
   '4-1': '愚人节',
-  '10-31': '万圣节前夜',
-  '11-1': '万圣节',
-  '12-24': '平安夜',
   '12-25': '圣诞节',
 }
 
@@ -23,10 +20,9 @@ const extraLunarFestivals: Record<string, string> = {
 const weekdayFestivals: Record<string, string> = {
   '5-2-7': '母亲节',
   '6-3-7': '父亲节',
-  '11-4-4': '感恩节',
 }
 
-// Professional and awareness days have lower priority than festivals and solar terms.
+// Commemorative and religious observances displayed with lower priority.
 // Environmental dates: https://www.un.org/en/observances/list-days-weeks
 const solarObservances: Record<string, string> = {
   '2-2': '世界湿地日',
@@ -41,8 +37,11 @@ const solarObservances: Record<string, string> = {
   '6-5': '世界环境日',
   '6-8': '世界海洋日',
   '9-16': '国际保护臭氧层日',
+  '10-31': '万圣节前夜',
+  '11-1': '万圣节',
   '11-8': '记者节',
   '11-17': '国际学生日',
+  '12-24': '平安夜',
 }
 
 // Occurrence 0 means the last matching weekday in the month.
@@ -51,10 +50,11 @@ const weekdayObservances: Record<string, string> = {
   '5-3-7': '全国助残日',
   '9-3-6': '全民国防教育日',
   '10-1-1': '世界住房日',
+  '11-4-4': '感恩节',
 }
 
 // Change display priority without changing the date rules for these observances.
-const lowPriorityFestivalNames = new Set(['教师节', '植树节', '寒衣节', '下元节', '将临期第一主日'])
+const lowPriorityFestivalNames = new Set(['教师节', '植树节', '寒衣节', '下元节'])
 
 export interface CalendarDay {
   date: Temporal.PlainDate
@@ -117,13 +117,16 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
   ]
   const primaryLabel = festivals[0] || solarTerm
   const nextTermDay = solar.next(1).getTermDay()
+  const christianFestival = getChristianFestival(date)
+  // Christian observances are secondary except for Easter and Christmas.
+  const isMajorChristianFestival = christianFestival === '复活节' || christianFestival === '圣诞节'
   const additionalEvents = [
     extraLunarFestivals[`${lunar.getMonth()}-${lunar.getDay()}`],
     // Observe 寒食 on the day before 清明, whose Gregorian date varies by year.
     nextTermDay.getDayIndex() === 0 && nextTermDay.getSolarTerm().getName() === '清明'
       ? '寒食节'
       : undefined,
-    getChristianFestival(date),
+    isMajorChristianFestival ? christianFestival : undefined,
   ].filter((name): name is string => name !== undefined)
   const additionalFestivals = additionalEvents.filter((name) => !lowPriorityFestivalNames.has(name))
   for (const name of additionalFestivals) {
@@ -140,6 +143,7 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
     weekdayObservances[`${month}-${week}-${date.dayOfWeek}`],
     day + 7 > date.daysInMonth ? weekdayObservances[`${month}-0-${date.dayOfWeek}`] : undefined,
     ...additionalEvents.filter((name) => lowPriorityFestivalNames.has(name)),
+    isMajorChristianFestival ? undefined : christianFestival,
   ].filter((name): name is string => name !== undefined)
   const observances = [seasonalDay?.toString(), ...observanceNames].filter(
     (name): name is string => name !== undefined,
