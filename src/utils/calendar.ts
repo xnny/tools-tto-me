@@ -1,5 +1,27 @@
 import { SolarDay } from 'tyme4ts'
 
+// Preserve the festivals shown before the tyme4ts migration that it does not include.
+const extraSolarFestivals: Record<string, string> = {
+  '2-14': '情人节',
+  '3-15': '消费者权益日',
+  '4-1': '愚人节',
+  '10-31': '万圣节前夜',
+  '11-1': '万圣节',
+  '12-24': '平安夜',
+  '12-25': '圣诞节',
+}
+
+// Keys use month-occurrence-ISO weekday; occurrence 0 means the last in the month.
+const weekdayFestivals: Record<string, string> = {
+  '3-0-1': '全国中小学生安全教育日',
+  '5-2-7': '母亲节',
+  '5-3-7': '全国助残日',
+  '6-3-7': '父亲节',
+  '9-3-6': '全民国防教育日',
+  '10-1-1': '世界住房日',
+  '11-4-4': '感恩节',
+}
+
 export interface CalendarDay {
   date: Temporal.PlainDate
   key: string
@@ -38,15 +60,24 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
   // The displayed year and zodiac change at Lunar New Year, while the month follows solar terms.
   const lunarYearCycle = lunar.getLunarMonth().getLunarYear().getSixtyCycle()
   const sixtyCycleDay = solar.getSixtyCycleDay()
+  const termDay = solar.getTermDay()
+  const solarTerm = termDay.getDayIndex() === 0 ? termDay.getSolarTerm().getName() : ''
+  const week = Math.ceil(day / 7)
   const festivals = [
     ...new Set(
-      [solar.getFestival()?.getName(), lunar.getFestival()?.getName()].filter(
-        (name) => name !== undefined,
+      [
+        solar.getFestival()?.getName(),
+        extraSolarFestivals[`${month}-${day}`],
+        weekdayFestivals[`${month}-${week}-${date.dayOfWeek}`],
+        day + 7 > date.daysInMonth ? weekdayFestivals[`${month}-0-${date.dayOfWeek}`] : undefined,
+        lunar.getFestival()?.getName(),
+      ].filter(
+        // Solar terms already have their own label: avoid 冬至节 / 冬至 and 清明节 / 清明.
+        (name): name is string =>
+          name !== undefined && name !== solarTerm && name !== `${solarTerm}节`,
       ),
     ),
   ]
-  const termDay = solar.getTermDay()
-  const solarTerm = termDay.getDayIndex() === 0 ? termDay.getSolarTerm().getName() : ''
   const holiday = solar.getLegalHoliday()
 
   return {

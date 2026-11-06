@@ -116,7 +116,7 @@ function selectHoliday() {
               type="button"
               class="day-cell"
               :class="{ outside: !day.inMonth, selected: day.key === selected.key, today: day.key === todayKey, festival: day.festivals.length || day.solarTerm }"
-              :aria-label="`${day.key} ${day.lunarDate}${day.festivals.length ? ' ' + day.festivals.join('、') : ''}`"
+              :aria-label="[day.key, day.lunarDate, ...day.festivals, day.solarTerm].filter(Boolean).join(' ')"
               :aria-pressed="day.key === selected.key"
               :disabled="day.date.year < 1901 || day.date.year > 2099"
               @click="selectDate(day.date)"

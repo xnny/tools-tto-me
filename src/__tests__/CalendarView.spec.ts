@@ -131,7 +131,33 @@ describe('calendar', () => {
     expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toMatch(
       new RegExp(`^${date} `),
     )
-    expect(wrapper.get('.detail-festival').text()).toContain(label)
+    expect(wrapper.get('.detail-festival').text()).toBe(label)
+  })
+
+  it.each([
+    { date: '2026-10-31', label: '万圣节前夜' },
+    { date: '2026-11-01', label: '万圣节' },
+    { date: '2026-12-25', label: '圣诞节' },
+  ])('shows $label in the calendar and selected-day details', ({ date, label }) => {
+    setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
+    const wrapper = mount(CalendarView)
+
+    expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe(label)
+    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(label)
+    expect(wrapper.get('.detail-festival').text()).toBe(label)
+  })
+
+  it.each([
+    { date: '2026-04-05', label: '清明' },
+    { date: '2026-12-22', label: '冬至' },
+  ])('shows $label once without an added festival suffix', ({ date, label }) => {
+    setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
+    const wrapper = mount(CalendarView)
+
+    expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe(label)
+    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(label)
+    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).not.toContain(`${label}节`)
+    expect(wrapper.get('.detail-festival').text()).toBe(label)
   })
 
   it('updates today when the page stays open past midnight', async () => {

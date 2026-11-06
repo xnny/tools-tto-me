@@ -50,6 +50,52 @@ describe('calendar data', () => {
     expect(getCalendarDay(Temporal.PlainDate.from('2026-02-14')).holiday).toBe('班')
   })
 
+  it.each([
+    { date: '2026-02-14', name: '情人节' },
+    { date: '2026-03-15', name: '消费者权益日' },
+    { date: '2026-04-01', name: '愚人节' },
+    { date: '2026-10-31', name: '万圣节前夜' },
+    { date: '2026-11-01', name: '万圣节' },
+    { date: '2026-12-24', name: '平安夜' },
+    { date: '2026-12-25', name: '圣诞节' },
+  ])('preserves the fixed-date festival $name on $date', ({ date, name }) => {
+    expect(getCalendarDay(Temporal.PlainDate.from(date))).toMatchObject({
+      lunarLabel: name,
+      festivals: [name],
+    })
+  })
+
+  it.each([
+    { date: '2025-05-11', name: '母亲节' },
+    { date: '2026-05-10', name: '母亲节' },
+    { date: '2025-06-15', name: '父亲节' },
+    { date: '2026-06-21', name: '父亲节' },
+    { date: '2025-11-27', name: '感恩节' },
+    { date: '2026-11-26', name: '感恩节' },
+    { date: '2025-03-31', name: '全国中小学生安全教育日' },
+    { date: '2028-03-27', name: '全国中小学生安全教育日' },
+    { date: '2026-05-17', name: '全国助残日' },
+    { date: '2026-09-19', name: '全民国防教育日' },
+    { date: '2026-10-05', name: '世界住房日' },
+  ])('places $name on the correct weekday occurrence in $date', ({ date, name }) => {
+    const target = Temporal.PlainDate.from(date)
+    expect(getCalendarDay(target).festivals).toContain(name)
+    expect(getCalendarDay(target).lunarLabel).toBe(name)
+    expect(getCalendarDay(target.subtract({ days: 7 })).festivals).not.toContain(name)
+    expect(getCalendarDay(target.add({ days: 7 })).festivals).not.toContain(name)
+  })
+
+  it.each([
+    { date: '2026-04-05', name: '清明' },
+    { date: '2026-12-22', name: '冬至' },
+  ])('uses the solar-term name $name without a duplicate festival', ({ date, name }) => {
+    expect(getCalendarDay(Temporal.PlainDate.from(date))).toMatchObject({
+      lunarLabel: name,
+      solarTerm: name,
+      festivals: [],
+    })
+  })
+
   it('does not show the preceding solar term on an ordinary day', () => {
     expect(getCalendarDay(Temporal.PlainDate.from('2026-02-05'))).toMatchObject({
       solarTerm: '',
@@ -87,10 +133,15 @@ describe('calendar data', () => {
     })
   })
 
-  it('preserves coinciding solar and lunar festivals with the solar festival first', () => {
-    expect(getCalendarDay(Temporal.PlainDate.from('2020-10-01'))).toMatchObject({
-      lunarLabel: '国庆节',
-      festivals: ['国庆节', '中秋节'],
+  it.each([
+    { date: '2020-10-01', festivals: ['国庆节', '中秋节'] },
+    { date: '2033-02-14', festivals: ['情人节', '元宵节'] },
+    { date: '2029-10-01', festivals: ['国庆节', '世界住房日'] },
+    { date: '2025-03-31', festivals: ['全国中小学生安全教育日', '上巳节'] },
+  ])('preserves coinciding festivals and their display priority on $date', ({ date, festivals }) => {
+    expect(getCalendarDay(Temporal.PlainDate.from(date))).toMatchObject({
+      lunarLabel: festivals[0],
+      festivals,
     })
   })
 
