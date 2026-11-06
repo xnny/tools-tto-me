@@ -116,7 +116,7 @@ function selectHoliday() {
               type="button"
               class="day-cell"
               :class="{ outside: !day.inMonth, selected: day.key === selected.key, today: day.key === todayKey, festival: day.festivals.length || day.solarTerm }"
-              :aria-label="[day.key, day.lunarDate, ...day.festivals, day.solarTerm].filter(Boolean).join(' ')"
+              :aria-label="[day.key, day.lunarDate, ...day.festivals, day.solarTerm, ...day.observances].filter(Boolean).join(' ')"
               :aria-pressed="day.key === selected.key"
               :disabled="day.date.year < 1901 || day.date.year > 2099"
               @click="selectDate(day.date)"
@@ -136,6 +136,7 @@ function selectHoliday() {
           <p class="detail-lunar">农历{{ selected.lunarDate }}</p>
           <p class="detail-ganzhi">{{ selected.gzYear }}年 【{{ selected.zodiac }}年】<br>{{ selected.gzMonth }}月 {{ selected.gzDay }}日</p>
           <p v-if="selected.festivals.length || selected.solarTerm" class="detail-festival">{{ [...selected.festivals, selected.solarTerm].filter(Boolean).join(' · ') }}</p>
+          <p v-if="selected.observances.length" class="detail-observances">{{ selected.observances.join(' · ') }}</p>
           <div class="almanac">
             <div class="almanac-row"><span class="almanac-tag good">宜</span><span>{{ selected.yi.slice(0, 8).join('　') || '诸事不宜' }}</span></div>
             <div class="almanac-row"><span class="almanac-tag bad">忌</span><span>{{ selected.ji.slice(0, 8).join('　') || '无' }}</span></div>
@@ -143,7 +144,7 @@ function selectHoliday() {
         </aside>
       </div>
     </section>
-    <p class="footnote">节假日及调休安排以官方公布为准</p>
+    <p class="footnote">基督教节日按西方教会常用公历日期标注；节假日及调休安排以官方公布为准</p>
   </main>
 </template>
 
@@ -191,6 +192,7 @@ select { appearance: none; height: 36px; min-width: 100px; padding: 0 30px 0 12p
 .detail-lunar { margin: 17px 0 7px; color: #364b67; font-size: 16px; font-weight: 600; }
 .detail-ganzhi { margin: 0; color: #8a9aac; font-size: 12px; line-height: 1.9; }
 .detail-festival { margin: 10px 0 0; color: #e17a66; font-size: 13px; }
+.detail-observances { margin: 10px 0 0; color: #7c8da1; font-size: 13px; }
 .almanac { display: grid; gap: 12px; margin-top: 22px; padding-top: 20px; border-top: 1px solid #e0eaf5; text-align: left; }
 .almanac-row { display: flex; gap: 9px; align-items: flex-start; color: #7c8da1; font-size: 12px; line-height: 1.8; }
 .almanac-tag { flex: 0 0 24px; height: 24px; border-radius: 5px; color: white; line-height: 24px; text-align: center; }

@@ -1,14 +1,26 @@
 import { SolarDay } from 'tyme4ts'
+import { getChristianFestival } from './christianFestivals'
 
-// Preserve the festivals shown before the tyme4ts migration that it does not include.
+// Additional solar festivals not included in tyme4ts.
 const extraSolarFestivals: Record<string, string> = {
   '2-14': '情人节',
   '3-15': '消费者权益日',
   '4-1': '愚人节',
+  '5-12': '国际护士节',
   '10-31': '万圣节前夜',
   '11-1': '万圣节',
+  '11-8': '记者节',
+  '11-17': '国际学生日',
   '12-24': '平安夜',
   '12-25': '圣诞节',
+}
+
+// Traditional festivals missing from tyme4ts. Leap lunar months use negative keys.
+const extraLunarFestivals: Record<string, string> = {
+  '10-1': '寒衣节',
+  '10-15': '下元节',
+  '12-23': '北方小年',
+  '12-24': '南方小年',
 }
 
 // Keys use month-occurrence-ISO weekday; occurrence 0 means the last in the month.
@@ -20,6 +32,21 @@ const weekdayFestivals: Record<string, string> = {
   '9-3-6': '全民国防教育日',
   '10-1-1': '世界住房日',
   '11-4-4': '感恩节',
+}
+
+// Environmental observances have lower display priority than festivals and solar terms.
+// https://www.un.org/en/observances/list-days-weeks
+const environmentalObservances: Record<string, string> = {
+  '2-2': '世界湿地日',
+  '3-3': '世界野生动植物日',
+  '3-21': '国际森林日',
+  '3-22': '世界水日',
+  '3-23': '世界气象日',
+  '4-22': '世界地球日',
+  '5-22': '国际生物多样性日',
+  '6-5': '世界环境日',
+  '6-8': '世界海洋日',
+  '9-16': '国际保护臭氧层日',
 }
 
 export interface CalendarDay {
@@ -36,6 +63,7 @@ export interface CalendarDay {
   zodiac: string
   festivals: string[]
   solarTerm: string
+  observances: string[]
   holiday: '休' | '班' | null
   yi: string[]
   ji: string[]
@@ -78,6 +106,35 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
       ),
     ),
   ]
+  const primaryLabel = festivals[0] || solarTerm
+  const nextTermDay = solar.next(1).getTermDay()
+  const additionalFestivals = [
+    extraLunarFestivals[`${lunar.getMonth()}-${lunar.getDay()}`],
+    // Observe 寒食 on the day before 清明, whose Gregorian date varies by year.
+    nextTermDay.getDayIndex() === 0 && nextTermDay.getSolarTerm().getName() === '清明'
+      ? '寒食节'
+      : undefined,
+    getChristianFestival(date),
+  ].filter((name): name is string => name !== undefined)
+  for (const name of additionalFestivals) {
+    if (!festivals.includes(name)) festivals.push(name)
+  }
+  // Keep coinciding festivals and solar terms visible, e.g. 清明 · 复活节 in 2026.
+  const festivalLabel = [...new Set([primaryLabel, ...additionalFestivals])]
+    .filter(Boolean)
+    .join(' · ')
+  const seasonalDay = solar.getDogDay() ?? solar.getNineDay()
+  const environmentalObservance = environmentalObservances[`${month}-${day}`]
+  const observances = [seasonalDay?.toString(), environmentalObservance].filter(
+    (name): name is string => name !== undefined,
+  )
+  // Show only the start of each 伏 / 九 in the grid; keep daily progress in the details.
+  const observanceLabel = [
+    seasonalDay?.getDayIndex() === 0 ? seasonalDay.getName() : undefined,
+    environmentalObservance,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const holiday = solar.getLegalHoliday()
 
   return {
@@ -85,7 +142,7 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
     key: dateKey(date),
     day,
     inMonth: true,
-    lunarLabel: festivals[0] || solarTerm || (lunar.getDay() === 1 ? lunarMonth : lunarDay),
+    lunarLabel: festivalLabel || observanceLabel || (lunar.getDay() === 1 ? lunarMonth : lunarDay),
     lunarDate: `${lunarMonth}${lunarDay}`,
     lunarYear: `${String(lunar.getYear()).replace(/\d/g, (digit) => '〇一二三四五六七八九'.charAt(Number(digit)))}年`,
     gzYear: lunarYearCycle.getName(),
@@ -94,6 +151,7 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
     zodiac: lunarYearCycle.getEarthBranch().getZodiac().getName(),
     festivals,
     solarTerm,
+    observances,
     holiday: holiday ? (holiday.isWork() ? '班' : '休') : null,
     yi: lunar.getRecommends().map((item) => item.getName()),
     ji: lunar.getAvoids().map((item) => item.getName()),

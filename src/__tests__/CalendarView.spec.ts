@@ -119,7 +119,7 @@ describe('calendar', () => {
   it.each([
     { holiday: '元旦', date: '2026-01-01', label: '元旦' },
     { holiday: '春节', date: '2026-02-17', label: '春节' },
-    { holiday: '清明节', date: '2026-04-05', label: '清明' },
+    { holiday: '清明节', date: '2026-04-05', label: '复活节 · 清明' },
     { holiday: '劳动节', date: '2026-05-01', label: '劳动节' },
     { holiday: '端午节', date: '2026-06-19', label: '端午节' },
     { holiday: '中秋节', date: '2026-09-25', label: '中秋节' },
@@ -138,26 +138,91 @@ describe('calendar', () => {
     { date: '2026-10-31', label: '万圣节前夜' },
     { date: '2026-11-01', label: '万圣节' },
     { date: '2026-12-25', label: '圣诞节' },
+    { date: '2026-01-06', label: '主显节' },
+    { date: '2026-04-03', label: '耶稣受难日' },
+    { date: '2027-03-28', label: '复活节' },
+    { date: '2026-05-14', label: '耶稣升天节' },
+    { date: '2026-05-24', label: '圣灵降临节' },
+    { date: '2026-11-29', label: '将临期第一主日' },
+    { date: '2025-06-15', label: '父亲节 · 三一主日' },
+    { date: '2026-02-10', label: '北方小年' },
+    { date: '2026-02-11', label: '南方小年' },
+    { date: '2026-04-04', label: '寒食节' },
+    { date: '2026-11-09', label: '寒衣节' },
+    { date: '2026-11-23', label: '下元节' },
+    { date: '2010-04-04', label: '寒食节 · 复活节' },
   ])('shows $label in the calendar and selected-day details', ({ date, label }) => {
     setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
     const wrapper = mount(CalendarView)
 
     expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe(label)
-    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(label)
+    for (const name of label.split(' · ')) {
+      expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(name)
+    }
     expect(wrapper.get('.detail-festival').text()).toBe(label)
   })
 
   it.each([
-    { date: '2026-04-05', label: '清明' },
-    { date: '2026-12-22', label: '冬至' },
-  ])('shows $label once without an added festival suffix', ({ date, label }) => {
+    { date: '2026-04-05', name: '清明', label: '清明 · 复活节', detail: '复活节 · 清明' },
+    { date: '2026-12-22', name: '冬至', label: '冬至', detail: '冬至' },
+    { date: '2028-01-20', name: '大寒', label: '大寒 · 南方小年', detail: '南方小年 · 大寒' },
+  ])('shows $name once without an added festival suffix', ({ date, name, label, detail }) => {
     setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
     const wrapper = mount(CalendarView)
 
     expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe(label)
-    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(label)
-    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).not.toContain(`${label}节`)
-    expect(wrapper.get('.detail-festival').text()).toBe(label)
+    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).toContain(name)
+    expect(wrapper.get('.day-cell.selected').attributes('aria-label')).not.toContain(`${name}节`)
+    expect(wrapper.get('.detail-festival').text()).toBe(detail)
+  })
+
+  it.each([
+    { date: '2026-04-22', label: '世界地球日', detail: '世界地球日' },
+    { date: '2026-02-02', label: '世界湿地日', detail: '五九第8天 · 世界湿地日' },
+    { date: '2026-07-15', label: '初伏', detail: '初伏第1天' },
+    { date: '2026-01-08', label: '三九', detail: '三九第1天' },
+  ])('shows $label without festival highlighting', ({ date, label, detail }) => {
+    setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
+    const wrapper = mount(CalendarView)
+    const cell = wrapper.get('.day-cell.selected')
+
+    expect(cell.get('.lunar-label').text()).toBe(label)
+    expect(cell.classes()).not.toContain('festival')
+    expect(wrapper.find('.detail-festival').exists()).toBe(false)
+    expect(wrapper.get('.detail-observances').text()).toBe(detail)
+    expect(wrapper.get('.detail-observances').classes()).not.toContain('detail-festival')
+    for (const name of detail.split(' · ')) {
+      expect(cell.attributes('aria-label')).toContain(name)
+    }
+  })
+
+  it.each([
+    { date: '2026-03-03', label: '元宵节', detail: '九九第1天 · 世界野生动植物日' },
+    { date: '2026-02-04', label: '立春', detail: '六九第1天' },
+    { date: '2026-12-22', label: '冬至', detail: '一九第1天' },
+    { date: '2026-06-05', label: '芒种', detail: '世界环境日' },
+  ])(
+    'keeps low-priority annotations in the details when $label is present',
+    ({ date, label, detail }) => {
+      setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
+      const wrapper = mount(CalendarView)
+
+      expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe(label)
+      expect(wrapper.get('.day-cell.selected').classes()).toContain('festival')
+      expect(wrapper.get('.detail-festival').text()).toBe(label)
+      expect(wrapper.get('.detail-observances').text()).toBe(detail)
+      expect(wrapper.get('.detail-observances').classes()).not.toContain('detail-festival')
+    },
+  )
+
+  it('shows the daily seasonal count only in the details after the starting day', async () => {
+    setNow('2026-07-15T12:00:00+08:00[Asia/Shanghai]')
+    const wrapper = mount(CalendarView)
+
+    await wrapper.get('button[aria-label^="2026-07-16 "]').trigger('click')
+    expect(wrapper.get('.day-cell.selected .lunar-label').text()).toBe('初三')
+    expect(wrapper.get('.day-cell.selected').classes()).not.toContain('festival')
+    expect(wrapper.get('.detail-observances').text()).toBe('初伏第2天')
   })
 
   it('updates today when the page stays open past midnight', async () => {
