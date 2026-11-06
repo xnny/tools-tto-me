@@ -145,16 +145,27 @@ export const parseTotpInput = (input: string, defaults: Partial<TotpConfig> = {}
   )
 }
 
-export const getTotpState = (
-  config: TotpConfig,
-  timestamp = Date.now(),
-): { code: string; remaining: number } => {
+/** Keep one validated generator and code for this account's current time step. */
+export const createTotpStateReader = (config: TotpConfig) => {
   const totp = new TOTP(validateTotpConfig(config))
-  return {
-    code: totp.generate({ timestamp }),
-    remaining: Math.ceil(totp.remaining({ timestamp }) / 1000),
+  let cachedCounter: number | undefined
+  let code = ''
+
+  return (timestamp = Date.now()): { code: string; remaining: number } => {
+    const counter = totp.counter({ timestamp })
+    if (counter !== cachedCounter) {
+      code = totp.generate({ timestamp })
+      cachedCounter = counter
+    }
+    return {
+      code,
+      remaining: Math.ceil(totp.remaining({ timestamp }) / 1000),
+    }
   }
 }
+
+export const getTotpState = (config: TotpConfig, timestamp = Date.now()) =>
+  createTotpStateReader(config)(timestamp)
 
 export const exportTotpRecords = (
   records: TotpRecord[],

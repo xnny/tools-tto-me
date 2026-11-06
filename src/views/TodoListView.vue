@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useVisibleInterval } from '@/composables/useVisibleInterval'
 import {
   clearExpiredTodos,
   getTodoDeleteAt,
@@ -28,18 +29,22 @@ const editValue = ref('')
 const editAutoDelete = ref(true)
 const editAutoDeleteStartedAt = ref<number>()
 const now = ref(Date.now())
-let countdownTimer: ReturnType<typeof setInterval> | undefined
-const deletionCountdown = computed(() => {
-  const todo = todos.value.find((item) => item.id === editingId.value)
-  if (!todo || !editAutoDelete.value) return ''
-  if (todo.completedAt === 0) return '完成后 7 天删除'
-
-  const deleteAt = getTodoDeleteAt({
+const editingTodo = computed(() => todos.value.find((item) => item.id === editingId.value))
+const editDeleteAt = computed(() => {
+  const todo = editingTodo.value
+  if (!todo || !editAutoDelete.value) return 0
+  return getTodoDeleteAt({
     ...todo,
     autoDelete: true,
     autoDeleteStartedAt: editAutoDeleteStartedAt.value ?? todo.autoDeleteStartedAt,
   })
-  const seconds = Math.max(0, Math.ceil((deleteAt - now.value) / 1000))
+})
+const deletionCountdown = computed(() => {
+  const todo = editingTodo.value
+  if (!todo || !editAutoDelete.value) return ''
+  if (todo.completedAt === 0) return '完成后 7 天删除'
+
+  const seconds = Math.max(0, Math.ceil((editDeleteAt.value - now.value) / 1000))
   if (seconds === 0) return '下次打开或刷新时删除'
 
   const days = Math.floor(seconds / 86400)
@@ -178,13 +183,17 @@ const saveEdit = async (todo: Todo) => {
   if (saved) await finishEditing()
 }
 
+useVisibleInterval(
+  () => {
+    now.value = Date.now()
+  },
+  1000,
+  () => editDeleteAt.value > now.value,
+)
+
 onMounted(() => {
   void loadTodos()
-  countdownTimer = setInterval(() => {
-    now.value = Date.now()
-  }, 1000)
 })
-onUnmounted(() => clearInterval(countdownTimer))
 </script>
 
 <template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useVisibleInterval } from '@/composables/useVisibleInterval'
 import {
+  createTotpStateReader,
   exportTotpRecords,
   getTotpState,
   parseTotpInput,
@@ -51,28 +53,37 @@ const activeQrRecord = computed(
 const activeQrState = computed(() =>
   activeQrRecord.value ? (secretQrStates.get(activeQrRecord.value.id) ?? null) : null,
 )
-const displayedRecords = computed(() =>
+const recordReaders = computed(() =>
   records.value.map((record) => {
+    try {
+      return { record, readState: createTotpStateReader(record) }
+    } catch {
+      return { record, readState: null }
+    }
+  }),
+)
+const invalidState = {
+  code: '',
+  remaining: 0,
+  error: '无法生成验证码，请删除后重新添加。',
+}
+const displayedRecords = computed(() =>
+  recordReaders.value.map(({ record, readState }) => {
+    if (!readState) return { record, ...invalidState }
     try {
       return {
         record,
-        ...getTotpState(record, now.value),
+        ...readState(now.value),
         error: '',
       }
     } catch {
-      return {
-        record,
-        code: '',
-        remaining: 0,
-        error: '无法生成验证码，请删除后重新添加。',
-      }
+      return { record, ...invalidState }
     }
   }),
 )
 
 let active = true
 let inputRevision = 0
-let timer: ReturnType<typeof setInterval> | undefined
 const downloadCleanup = new Map<string, ReturnType<typeof setTimeout>>()
 
 const errorMessage = (error: unknown, fallback: string) =>
@@ -361,26 +372,18 @@ const exportRecords = () => {
 const refreshTime = () => {
   now.value = Date.now()
 }
-const refreshVisibleTime = () => {
-  if (document.visibilityState === 'visible') refreshTime()
-}
+useVisibleInterval(refreshTime, 1000, () => records.value.length > 0)
 
 onMounted(() => {
   void loadRecords()
-  timer = setInterval(refreshTime, 1000)
-  window.addEventListener('focus', refreshTime)
   window.addEventListener('keydown', onKeydown)
-  document.addEventListener('visibilitychange', refreshVisibleTime)
   document.addEventListener('paste', onDocumentPaste)
 })
 
 onBeforeUnmount(() => {
   active = false
   inputRevision += 1
-  clearInterval(timer)
-  window.removeEventListener('focus', refreshTime)
   window.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('visibilitychange', refreshVisibleTime)
   document.removeEventListener('paste', onDocumentPaste)
   secretQrStates.clear()
   secretQrRequests.clear()

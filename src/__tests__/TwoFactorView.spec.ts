@@ -1,5 +1,6 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TOTP } from 'otpauth'
 import TwoFactorView from '../views/TwoFactorView.vue'
 import { getTotpState, type TotpRecord } from '../utils/twoFactor'
 import {
@@ -40,6 +41,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.useFakeTimers()
   vi.setSystemTime(59000)
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
   vi.mocked(getTwoFactorRecords).mockResolvedValue([])
   vi.mocked(addTwoFactorRecord).mockImplementation(async (config) => ({
     ...config,
@@ -88,6 +90,7 @@ const uploadScreenshot = async (wrapper: View) => {
 
 describe('two-factor view', () => {
   it('shows an empty list and disables export until records exist', async () => {
+    const interval = vi.spyOn(globalThis, 'setInterval')
     const wrapper = await renderView()
     expect(wrapper.text()).toContain('还没有密钥，添加第一个账号吧。')
     expect(wrapper.get<HTMLButtonElement>('.export-actions button').element.disabled).toBe(true)
@@ -96,6 +99,12 @@ describe('two-factor view', () => {
     expect(wrapper.get('.footnote').text()).toContain(
       '下载 JSON 文件到本地，文件包含明文密钥，请妥善保存。',
     )
+    // Vue's development renderer may schedule a one-off DevTools timeout on first mount.
+    expect(interval).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('focus'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(interval).not.toHaveBeenCalled()
   })
 
   it('retains input and allows retry when loading browser storage fails', async () => {
@@ -404,6 +413,8 @@ describe('two-factor view', () => {
   })
 
   it('deletes only after confirmation and preserves the record on failure', async () => {
+    const interval = vi.spyOn(globalThis, 'setInterval')
+    const clear = vi.spyOn(globalThis, 'clearInterval')
     vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
     const wrapper = await renderView()
     vi.mocked(window.confirm).mockReturnValueOnce(false)
@@ -419,6 +430,75 @@ describe('two-factor view', () => {
     expect(removeTwoFactorRecord).toHaveBeenLastCalledWith(record.id)
     expect(wrapper.findAll('.two-factor-item')).toHaveLength(0)
     expect(wrapper.text()).toContain('已删除密钥')
+    expect(clear).toHaveBeenCalledWith(interval.mock.results[0]?.value)
+  })
+
+  it('updates the countdown without regenerating the code until its period changes', async () => {
+    vi.setSystemTime(30000)
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    const generate = vi.spyOn(TOTP.prototype, 'generate')
+    const wrapper = await renderView()
+    const initialCode = wrapper.get('.otp-code').text()
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(wrapper.get('.countdown').text()).toBe('10 秒后刷新')
+    expect(wrapper.get('.otp-code').text()).toBe(initialCode)
+    expect(generate).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.countdown').text()).toBe('30 秒后刷新')
+  })
+
+  it('stops work while hidden and immediately refreshes the latest code when visible', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    const interval = vi.spyOn(globalThis, 'setInterval')
+    const clear = vi.spyOn(globalThis, 'clearInterval')
+    const generate = vi.spyOn(TOTP.prototype, 'generate')
+    const wrapper = await renderView()
+    const initialCode = wrapper.get('.otp-code').text()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get')
+    visibility.mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('focus'))
+    await flushPromises()
+    expect(clear).toHaveBeenCalledWith(interval.mock.results[0]?.value)
+    await vi.advanceTimersByTimeAsync(91000)
+    expect(wrapper.get('.otp-code').text()).toBe(initialCode)
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(interval).toHaveBeenCalledTimes(1)
+
+    visibility.mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.otp-code').text()).toBe(getTotpState(record, 150000).code)
+    expect(wrapper.get('.countdown').text()).toBe('30 秒后刷新')
+    expect(interval).toHaveBeenCalledTimes(2)
+  })
+
+  it('waits to start the clock when the page is initially hidden', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([record])
+    const interval = vi.spyOn(globalThis, 'setInterval')
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    const wrapper = await renderView()
+    expect(interval).not.toHaveBeenCalled()
+    vi.setSystemTime(90000)
+    visibility.mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(wrapper.get('.otp-code').text()).toBe(getTotpState(record, 90000).code)
+    expect(interval).toHaveBeenCalledTimes(1)
+  })
+
+  it('isolates an invalid stored record while valid account codes continue updating', async () => {
+    vi.mocked(getTwoFactorRecords).mockResolvedValue([
+      { ...record, id: 2, secret: 'invalid!' },
+      record,
+    ])
+    const wrapper = await renderView()
+    expect(wrapper.findAll('.two-factor-item')).toHaveLength(2)
+    expect(wrapper.text()).toContain('无法生成验证码，请删除后重新添加。')
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.get('.otp-code').text()).toBe(getTotpState(record, 60000).code)
   })
 
   it('updates each second and on focus or visibility, then cleans up on unmount', async () => {

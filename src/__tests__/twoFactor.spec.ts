@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { Secret } from 'otpauth'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Secret, TOTP } from 'otpauth'
 import {
+  createTotpStateReader,
   exportTotpRecords,
   getTotpState,
   parseTotpInput,
@@ -19,6 +20,8 @@ const config: TotpConfig = {
   digits: 6,
   period: 30,
 }
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('TOTP input', () => {
   it('normalizes manually entered Base32 while preserving chosen options', () => {
@@ -134,6 +137,54 @@ const vectors: [number, string, string, string][] = [
 ]
 
 describe('TOTP codes', () => {
+  it('reuses the code and decoded secret while the countdown changes within a period', () => {
+    const generate = vi.spyOn(TOTP.prototype, 'generate')
+    const decode = vi.spyOn(Secret, 'fromBase32')
+    const readState = createTotpStateReader({
+      ...config,
+      secret: Secret.fromUTF8(rfcSecrets.SHA1).base32,
+    })
+    const initialDecodes = decode.mock.calls.length
+
+    expect(readState(30000)).toEqual({ code: '287082', remaining: 30 })
+    expect(readState(45000)).toEqual({ code: '287082', remaining: 15 })
+    expect(readState(59999)).toEqual({ code: '287082', remaining: 1 })
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(decode).toHaveBeenCalledTimes(initialDecodes)
+  })
+
+  it.each([30, 60])('refreshes at boundaries, skipped periods and clock rollback with period %s', (period) => {
+    const readState = createTotpStateReader({
+      ...config,
+      period,
+      secret: Secret.fromUTF8(rfcSecrets.SHA1).base32,
+    })
+    const step = period * 1000
+    expect(readState(step - 1)).toEqual({ code: '755224', remaining: 1 })
+    expect(readState(step)).toEqual({ code: '287082', remaining: period })
+    expect(readState(step * 3)).toEqual({ code: '969429', remaining: period })
+    expect(readState(step - 1)).toEqual({ code: '755224', remaining: 1 })
+  })
+
+  it('keeps generators independent when accounts have different algorithms and periods', () => {
+    const readSha1 = createTotpStateReader({
+      ...config,
+      digits: 8,
+      secret: Secret.fromUTF8(rfcSecrets.SHA1).base32,
+    })
+    const readSha256 = createTotpStateReader({
+      ...config,
+      algorithm: 'SHA256',
+      digits: 8,
+      period: 60,
+      secret: Secret.fromUTF8(rfcSecrets.SHA256).base32,
+    })
+    expect(readSha1(59000)).toEqual({ code: '94287082', remaining: 1 })
+    expect(readSha256(119000)).toEqual({ code: '46119246', remaining: 1 })
+    expect(readSha1(59000)).toEqual({ code: '94287082', remaining: 1 })
+    expect(() => createTotpStateReader({ ...config, secret: 'invalid!' })).toThrow('Base32')
+  })
+
   it.each(vectors)(
     'matches RFC 6238 at Unix second %s, including leading zeros',
     (seconds, ...codes) => {

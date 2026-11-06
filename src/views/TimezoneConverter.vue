@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import { useVisibleInterval } from '@/composables/useVisibleInterval';
 import {
   getRecentTimezones,
   removeRecentTimezone,
@@ -15,7 +16,6 @@ const recentTimezones = ref<RecentTimezone[]>([]);
 const historyLoading = ref(true);
 const historyError = ref('');
 let historyUpdates = Promise.resolve();
-let timer: number | undefined;
 
 const resolveOffsetHours = (zone?: string) => {
   if (!zone) {
@@ -144,17 +144,9 @@ const outputValue = computed(() => {
 
 const currentTime = computed(() => formatTimeInZone(nowSeconds.value, offsetHours.value) ?? 'NaN');
 
-onMounted(() => {
-  timer = window.setInterval(() => {
-    nowSeconds.value = Math.floor(Date.now() / 1000);
-  }, 1000);
-});
-
-onBeforeUnmount(() => {
-  if (timer) {
-    window.clearInterval(timer);
-  }
-});
+useVisibleInterval(() => {
+  nowSeconds.value = Math.floor(Date.now() / 1000);
+}, 1000);
 </script>
 
 <template>
