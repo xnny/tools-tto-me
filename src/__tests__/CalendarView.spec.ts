@@ -181,6 +181,11 @@ describe('calendar', () => {
     { date: '2026-02-02', label: '世界湿地日', detail: '五九第8天 · 世界湿地日' },
     { date: '2026-07-15', label: '初伏', detail: '初伏第1天' },
     { date: '2026-01-08', label: '三九', detail: '三九第1天' },
+    { date: '2026-11-17', label: '国际学生日', detail: '国际学生日' },
+    { date: '2026-11-08', label: '记者节', detail: '记者节' },
+    { date: '2026-05-12', label: '国际护士节', detail: '国际护士节' },
+    { date: '2026-09-10', label: '教师节', detail: '教师节' },
+    { date: '2026-03-12', label: '植树节', detail: '植树节' },
   ])('shows $label without festival highlighting', ({ date, label, detail }) => {
     setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
     const wrapper = mount(CalendarView)
@@ -201,6 +206,9 @@ describe('calendar', () => {
     { date: '2026-02-04', label: '立春', detail: '六九第1天' },
     { date: '2026-12-22', label: '冬至', detail: '一九第1天' },
     { date: '2026-06-05', label: '芒种', detail: '世界环境日' },
+    { date: '2009-11-17', label: '寒衣节', detail: '国际学生日' },
+    { date: '2019-11-08', label: '立冬', detail: '记者节' },
+    { date: '2019-05-12', label: '母亲节', detail: '国际护士节' },
   ])(
     'keeps low-priority annotations in the details when $label is present',
     ({ date, label, detail }) => {

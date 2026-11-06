@@ -52,7 +52,6 @@ describe('calendar data', () => {
 
   it.each([
     { date: '2026-02-14', name: '情人节' },
-    { date: '2026-03-15', name: '消费者权益日' },
     { date: '2026-04-01', name: '愚人节' },
     { date: '2026-10-31', name: '万圣节前夜' },
     { date: '2026-11-01', name: '万圣节' },
@@ -68,14 +67,20 @@ describe('calendar data', () => {
   it.each([
     { date: '2026-02-02', name: '世界湿地日' },
     { date: '2026-03-03', name: '世界野生动植物日' },
+    { date: '2026-03-12', name: '植树节' },
+    { date: '2026-03-15', name: '消费者权益日' },
     { date: '2026-03-21', name: '国际森林日' },
     { date: '2026-03-22', name: '世界水日' },
     { date: '2026-03-23', name: '世界气象日' },
     { date: '2026-04-22', name: '世界地球日' },
+    { date: '2026-05-12', name: '国际护士节' },
     { date: '2026-05-22', name: '国际生物多样性日' },
     { date: '2026-06-05', name: '世界环境日' },
     { date: '2026-06-08', name: '世界海洋日' },
+    { date: '2026-09-10', name: '教师节' },
     { date: '2026-09-16', name: '国际保护臭氧层日' },
+    { date: '2026-11-08', name: '记者节' },
+    { date: '2026-11-17', name: '国际学生日' },
   ])('keeps $name as a low-priority observance on $date', ({ date, name }) => {
     const target = Temporal.PlainDate.from(date)
     const current = getCalendarDay(target)
@@ -83,6 +88,16 @@ describe('calendar data', () => {
     expect(current.festivals).not.toContain(name)
     expect(getCalendarDay(target.subtract({ days: 1 })).observances).not.toContain(name)
     expect(getCalendarDay(target.add({ days: 1 })).observances).not.toContain(name)
+  })
+
+  it.each([
+    { before: '1984-09-10', first: '1985-09-10', name: '教师节' },
+    { before: '1978-03-12', first: '1979-03-12', name: '植树节' },
+  ])('preserves the first observed year of $name', ({ before, first, name }) => {
+    expect(getCalendarDay(Temporal.PlainDate.from(before)).observances).not.toContain(name)
+    const day = getCalendarDay(Temporal.PlainDate.from(first))
+    expect(day.observances).toContain(name)
+    expect(day.festivals).not.toContain(name)
   })
 
   it.each([
@@ -138,7 +153,9 @@ describe('calendar data', () => {
   it.each(['2025-07-19', '2025-08-19', '2026-07-14', '2026-08-24', '2025-12-20', '2026-03-12'])(
     'does not retain seasonal annotations outside their periods on %s',
     (date) => {
-      expect(getCalendarDay(Temporal.PlainDate.from(date)).observances).toEqual([])
+      expect(getCalendarDay(Temporal.PlainDate.from(date)).observances).not.toContainEqual(
+        expect.stringMatching(/(?:伏|九)第\d+天$/),
+      )
     },
   )
 
@@ -303,17 +320,38 @@ describe('calendar data', () => {
     { date: '2026-06-21', name: '父亲节' },
     { date: '2025-11-27', name: '感恩节' },
     { date: '2026-11-26', name: '感恩节' },
-    { date: '2025-03-31', name: '全国中小学生安全教育日' },
-    { date: '2028-03-27', name: '全国中小学生安全教育日' },
-    { date: '2026-05-17', name: '全国助残日' },
-    { date: '2026-09-19', name: '全民国防教育日' },
-    { date: '2026-10-05', name: '世界住房日' },
   ])('places $name on the correct weekday occurrence in $date', ({ date, name }) => {
     const target = Temporal.PlainDate.from(date)
     expect(getCalendarDay(target).festivals).toContain(name)
     expect(getCalendarDay(target).lunarLabel.split(' · ')[0]).toBe(name)
     expect(getCalendarDay(target.subtract({ days: 7 })).festivals).not.toContain(name)
     expect(getCalendarDay(target.add({ days: 7 })).festivals).not.toContain(name)
+  })
+
+  it.each([
+    { date: '2025-03-31', name: '全国中小学生安全教育日' },
+    { date: '2028-03-27', name: '全国中小学生安全教育日' },
+    { date: '2026-05-17', name: '全国助残日' },
+    { date: '2026-09-19', name: '全民国防教育日' },
+    { date: '2026-10-05', name: '世界住房日' },
+  ])('keeps the weekday rule for the low-priority observance $name on $date', ({ date, name }) => {
+    const target = Temporal.PlainDate.from(date)
+    const day = getCalendarDay(target)
+    expect(day.observances).toContain(name)
+    expect(day.festivals).not.toContain(name)
+    expect(getCalendarDay(target.subtract({ days: 7 })).observances).not.toContain(name)
+    expect(getCalendarDay(target.add({ days: 7 })).observances).not.toContain(name)
+  })
+
+  it.each([
+    { date: '2025-03-31', festival: '上巳节', observance: '全国中小学生安全教育日' },
+    { date: '2029-10-01', festival: '国庆节', observance: '世界住房日' },
+  ])('keeps $festival above a coinciding weekday observance', ({ date, festival, observance }) => {
+    expect(getCalendarDay(Temporal.PlainDate.from(date))).toMatchObject({
+      lunarLabel: festival,
+      festivals: [festival],
+      observances: [observance],
+    })
   })
 
   it.each([
@@ -370,8 +408,6 @@ describe('calendar data', () => {
   it.each([
     { date: '2020-10-01', festivals: ['国庆节', '中秋节'] },
     { date: '2033-02-14', festivals: ['情人节', '元宵节'] },
-    { date: '2029-10-01', festivals: ['国庆节', '世界住房日'] },
-    { date: '2025-03-31', festivals: ['全国中小学生安全教育日', '上巳节'] },
   ])(
     'preserves coinciding festivals and their display priority on $date',
     ({ date, festivals }) => {
