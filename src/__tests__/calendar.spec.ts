@@ -170,12 +170,8 @@ describe('calendar data', () => {
   it.each([
     { date: '2026-02-10', name: '北方小年', lunarDate: '腊月廿三' },
     { date: '2026-02-11', name: '南方小年', lunarDate: '腊月廿四' },
-    { date: '2026-11-09', name: '寒衣节', lunarDate: '十月初一' },
-    { date: '2026-11-23', name: '下元节', lunarDate: '十月十五' },
     { date: '2027-01-30', name: '北方小年', lunarDate: '腊月廿三' },
     { date: '2027-01-31', name: '南方小年', lunarDate: '腊月廿四' },
-    { date: '2027-10-29', name: '寒衣节', lunarDate: '十月初一' },
-    { date: '2027-11-12', name: '下元节', lunarDate: '十月十五' },
   ])('marks $name on its lunar date in $date', ({ date, name, lunarDate }) => {
     const target = Temporal.PlainDate.from(date)
     expect(getCalendarDay(target)).toMatchObject({
@@ -185,6 +181,35 @@ describe('calendar data', () => {
     })
     expect(getCalendarDay(target.subtract({ days: 1 })).festivals).not.toContain(name)
     expect(getCalendarDay(target.add({ days: 1 })).festivals).not.toContain(name)
+  })
+
+  it.each([
+    { date: '2026-11-09', name: '寒衣节', lunarDate: '十月初一' },
+    { date: '2026-11-23', name: '下元节', lunarDate: '十月十五' },
+    { date: '2027-10-29', name: '寒衣节', lunarDate: '十月初一' },
+    { date: '2027-11-12', name: '下元节', lunarDate: '十月十五' },
+  ])('keeps $name on its lunar date with low priority in $date', ({ date, name, lunarDate }) => {
+    const target = Temporal.PlainDate.from(date)
+    expect(getCalendarDay(target)).toMatchObject({
+      lunarLabel: name,
+      lunarDate,
+      festivals: [],
+      observances: [name],
+    })
+    expect(getCalendarDay(target.subtract({ days: 1 })).observances).not.toContain(name)
+    expect(getCalendarDay(target.add({ days: 1 })).observances).not.toContain(name)
+  })
+
+  it.each([
+    { date: '2014-11-22', term: '小雪', observances: ['寒衣节'] },
+    { date: '2003-11-08', term: '立冬', observances: ['记者节', '下元节'] },
+  ])('keeps $term above coinciding lunar observances on $date', ({ date, term, observances }) => {
+    expect(getCalendarDay(Temporal.PlainDate.from(date))).toMatchObject({
+      lunarLabel: term,
+      solarTerm: term,
+      festivals: [],
+      observances,
+    })
   })
 
   it.each(['2024-04-03', '2026-04-04'])(
@@ -215,9 +240,12 @@ describe('calendar data', () => {
     { regular: '1984-10-24', leap: '1984-11-23', name: '寒衣节', lunarDate: '闰十月初一' },
     { regular: '1984-11-07', leap: '1984-12-07', name: '下元节', lunarDate: '闰十月十五' },
   ])('does not repeat $name in a leap lunar month', ({ regular, leap, name, lunarDate }) => {
-    expect(getCalendarDay(Temporal.PlainDate.from(regular)).festivals).toContain(name)
+    const regularDay = getCalendarDay(Temporal.PlainDate.from(regular))
+    expect(regularDay.observances).toContain(name)
+    expect(regularDay.festivals).not.toContain(name)
     const leapDay = getCalendarDay(Temporal.PlainDate.from(leap))
     expect(leapDay.lunarDate).toBe(lunarDate)
+    expect(leapDay.observances).not.toContain(name)
     expect(leapDay.festivals).not.toContain(name)
     expect(leapDay.lunarLabel).not.toContain(name)
   })
@@ -258,7 +286,6 @@ describe('calendar data', () => {
     { date: '2026-05-14', name: '耶稣升天节' },
     { date: '2026-05-24', name: '圣灵降临节' },
     { date: '2026-05-31', name: '三一主日' },
-    { date: '2026-11-29', name: '将临期第一主日' },
     { date: '2027-02-10', name: '圣灰星期三' },
     { date: '2027-03-26', name: '耶稣受难日' },
     { date: '2027-05-06', name: '耶稣升天节' },
@@ -289,15 +316,29 @@ describe('calendar data', () => {
     expect(getCalendarDay(target.add({ days: 7 })).festivals).not.toContain('复活节')
   })
 
-  it.each(['2022-11-27', '2023-12-03', '2027-11-28'])(
-    'places the first Sunday of Advent on %s',
+  it.each(['2022-11-27', '2023-12-03', '2026-11-29', '2027-11-28'])(
+    'places the first Sunday of Advent on %s with low priority',
     (date) => {
       const target = Temporal.PlainDate.from(date)
-      expect(getCalendarDay(target).festivals).toContain('将临期第一主日')
-      expect(getCalendarDay(target.subtract({ days: 7 })).festivals).not.toContain('将临期第一主日')
-      expect(getCalendarDay(target.add({ days: 7 })).festivals).not.toContain('将临期第一主日')
+      expect(getCalendarDay(target)).toMatchObject({
+        lunarLabel: '将临期第一主日',
+        festivals: [],
+        observances: ['将临期第一主日'],
+      })
+      expect(getCalendarDay(target.subtract({ days: 7 })).observances).not.toContain(
+        '将临期第一主日',
+      )
+      expect(getCalendarDay(target.add({ days: 7 })).observances).not.toContain('将临期第一主日')
     },
   )
+
+  it('preserves coinciding lunar and Christian observances without festival highlighting', () => {
+    expect(getCalendarDay(Temporal.PlainDate.from('2020-11-29'))).toMatchObject({
+      lunarLabel: '下元节 · 将临期第一主日',
+      festivals: [],
+      observances: ['下元节', '将临期第一主日'],
+    })
+  })
 
   it('retains existing festivals when a Christian observance falls on the same date', () => {
     expect(getCalendarDay(Temporal.PlainDate.from('2025-06-15'))).toMatchObject({

@@ -53,8 +53,8 @@ const weekdayObservances: Record<string, string> = {
   '10-1-1': '世界住房日',
 }
 
-// Keep the library's date and starting-year rules while using ordinary annotation styling.
-const libraryObservanceNames = new Set(['教师节', '植树节'])
+// Change display priority without changing the date rules for these observances.
+const lowPriorityFestivalNames = new Set(['教师节', '植树节', '寒衣节', '下元节', '将临期第一主日'])
 
 export interface CalendarDay {
   date: Temporal.PlainDate
@@ -99,7 +99,8 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
   const solarTerm = termDay.getDayIndex() === 0 ? termDay.getSolarTerm().getName() : ''
   const week = Math.ceil(day / 7)
   const solarFestival = solar.getFestival()?.getName()
-  const isSolarObservance = solarFestival !== undefined && libraryObservanceNames.has(solarFestival)
+  const isSolarObservance =
+    solarFestival !== undefined && lowPriorityFestivalNames.has(solarFestival)
   const festivals = [
     ...new Set(
       [
@@ -116,7 +117,7 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
   ]
   const primaryLabel = festivals[0] || solarTerm
   const nextTermDay = solar.next(1).getTermDay()
-  const additionalFestivals = [
+  const additionalEvents = [
     extraLunarFestivals[`${lunar.getMonth()}-${lunar.getDay()}`],
     // Observe 寒食 on the day before 清明, whose Gregorian date varies by year.
     nextTermDay.getDayIndex() === 0 && nextTermDay.getSolarTerm().getName() === '清明'
@@ -124,6 +125,7 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
       : undefined,
     getChristianFestival(date),
   ].filter((name): name is string => name !== undefined)
+  const additionalFestivals = additionalEvents.filter((name) => !lowPriorityFestivalNames.has(name))
   for (const name of additionalFestivals) {
     if (!festivals.includes(name)) festivals.push(name)
   }
@@ -137,6 +139,7 @@ export function getCalendarDay(date: Temporal.PlainDate): CalendarDay {
     solarObservances[`${month}-${day}`],
     weekdayObservances[`${month}-${week}-${date.dayOfWeek}`],
     day + 7 > date.daysInMonth ? weekdayObservances[`${month}-0-${date.dayOfWeek}`] : undefined,
+    ...additionalEvents.filter((name) => lowPriorityFestivalNames.has(name)),
   ].filter((name): name is string => name !== undefined)
   const observances = [seasonalDay?.toString(), ...observanceNames].filter(
     (name): name is string => name !== undefined,

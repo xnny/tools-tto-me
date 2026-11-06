@@ -143,13 +143,10 @@ describe('calendar', () => {
     { date: '2027-03-28', label: '复活节' },
     { date: '2026-05-14', label: '耶稣升天节' },
     { date: '2026-05-24', label: '圣灵降临节' },
-    { date: '2026-11-29', label: '将临期第一主日' },
     { date: '2025-06-15', label: '父亲节 · 三一主日' },
     { date: '2026-02-10', label: '北方小年' },
     { date: '2026-02-11', label: '南方小年' },
     { date: '2026-04-04', label: '寒食节' },
-    { date: '2026-11-09', label: '寒衣节' },
-    { date: '2026-11-23', label: '下元节' },
     { date: '2010-04-04', label: '寒食节 · 复活节' },
   ])('shows $label in the calendar and selected-day details', ({ date, label }) => {
     setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
@@ -186,6 +183,11 @@ describe('calendar', () => {
     { date: '2026-05-12', label: '国际护士节', detail: '国际护士节' },
     { date: '2026-09-10', label: '教师节', detail: '教师节' },
     { date: '2026-03-12', label: '植树节', detail: '植树节' },
+    { date: '2026-11-09', label: '寒衣节', detail: '寒衣节' },
+    { date: '2026-11-23', label: '下元节', detail: '下元节' },
+    { date: '2026-11-29', label: '将临期第一主日', detail: '将临期第一主日' },
+    { date: '2009-11-17', label: '国际学生日 · 寒衣节', detail: '国际学生日 · 寒衣节' },
+    { date: '2020-11-29', label: '下元节 · 将临期第一主日', detail: '下元节 · 将临期第一主日' },
   ])('shows $label without festival highlighting', ({ date, label, detail }) => {
     setNow(`${date}T12:00:00+08:00[Asia/Shanghai]`)
     const wrapper = mount(CalendarView)
@@ -206,7 +208,8 @@ describe('calendar', () => {
     { date: '2026-02-04', label: '立春', detail: '六九第1天' },
     { date: '2026-12-22', label: '冬至', detail: '一九第1天' },
     { date: '2026-06-05', label: '芒种', detail: '世界环境日' },
-    { date: '2009-11-17', label: '寒衣节', detail: '国际学生日' },
+    { date: '2014-11-22', label: '小雪', detail: '寒衣节' },
+    { date: '2003-11-08', label: '立冬', detail: '记者节 · 下元节' },
     { date: '2019-11-08', label: '立冬', detail: '记者节' },
     { date: '2019-05-12', label: '母亲节', detail: '国际护士节' },
   ])(
