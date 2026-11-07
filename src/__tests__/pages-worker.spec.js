@@ -10,7 +10,7 @@ describe('Pages SPA response status', () => {
     '/', '/calendar', '/CALENDAR/', '/timezone', '/timezone/',
     '/timezone/utc', '/TIMEZONE/UTC/', '/timezone/utc+8', '/TIMEZONE/UTC-8/', '/timezone/utc+99',
     '/timezone/utf-8', '/timezone/utc8', '/timezone/utc+100',
-    '/todo', '/TODO/', '/todo/list', '/TODO/LIST/', '/todo/list/extra', '/todo/extra',
+    '/todo', '/TODO/', '/todo/add', '/TODO/ADD/', '/todo/list', '/TODO/LIST/', '/todo/add/extra', '/todo/list/extra', '/todo/extra',
     '/calendar/extra', '/unknown', '/assets/missing.js',
     '/2af', '/2AF/', '/2af/extra',
     '/guide', '/GUIDE/', '/guide/extra',

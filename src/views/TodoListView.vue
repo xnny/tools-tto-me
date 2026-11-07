@@ -202,7 +202,7 @@ onMounted(() => {
       <p class="eyebrow">TODO</p>
       <h1>我的待办</h1>
       <nav class="todo-nav" aria-label="待办导航">
-        <RouterLink to="/todo">新增待办</RouterLink>
+        <RouterLink to="/todo/add">新增待办</RouterLink>
         <RouterLink to="/todo/list">我的待办</RouterLink>
       </nav>
     </header>

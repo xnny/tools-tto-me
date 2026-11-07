@@ -6,7 +6,10 @@ test('persists batches, multiline content, edits, completion, and deletion acros
 }) => {
   await page.goto('/')
   await page.locator('.tool-card').filter({ hasText: '待办事项' }).click()
-  await expect(page).toHaveURL(/\/todo$/)
+  await expect(page).toHaveURL(/\/todo\/list$/)
+  await expect(page).toHaveTitle('我的待办 · TTO Tools')
+  await page.getByRole('link', { name: '新增待办', exact: true }).click()
+  await expect(page).toHaveURL(/\/todo\/add$/)
   await expect(page).toHaveTitle('待办事项 · TTO Tools')
   await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
 
@@ -59,7 +62,7 @@ test('persists batches, multiline content, edits, completion, and deletion acros
 })
 
 test('retains unmatched fences and commits nothing until they are closed', async ({ page }) => {
-  await page.goto('/todo')
+  await page.goto('/todo/add')
   const input = page.getByLabel('新增待办', { exact: true })
   const draft = '普通待办\n```多行\n内容'
   await input.fill(draft)
@@ -82,7 +85,7 @@ test('rolls back the entire batch on a database write failure and keeps the draf
 }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/todo')
+  await page.goto('/todo/add')
   await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
   await page.evaluate(() => {
     const originalAdd = IDBObjectStore.prototype.add
@@ -118,7 +121,7 @@ test('shows an actionable error when browser storage is unavailable', async ({ p
     Object.defineProperty(globalThis, 'indexedDB', { value: undefined })
   })
 
-  await page.goto('/todo')
+  await page.goto('/todo/add')
   await expect(page.getByRole('alert')).toContainText('无法读取或清理本地待办')
   await page.getByLabel('新增待办', { exact: true }).fill('待保存的内容')
   await expect(page.getByRole('button', { name: '添加待办', exact: true })).toBeDisabled()
@@ -176,7 +179,7 @@ test('saves drafts after an idle second and restores them across reloads and pag
   page,
 }) => {
   await page.clock.install({ time: new Date('2026-11-04T08:00:00Z') })
-  await page.goto('/todo')
+  await page.goto('/todo/add')
   await expect(page.getByLabel('新增待办', { exact: true })).toBeEnabled()
   await page.clock.pauseAt(new Date('2026-11-04T09:00:00Z'))
   const input = page.getByLabel('新增待办', { exact: true })

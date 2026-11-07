@@ -20,7 +20,7 @@ const year = new Date().getFullYear()
             :key="tool.name"
             :to="tool.path"
             class="nav-link"
-            :class="{ 'router-link-active': tool.name === 'Todo' && $route.name === 'TodoList' }"
+            :class="{ 'router-link-active': tool.name === 'Todo' && $route.name === 'Todo' }"
           >
             {{ tool.title }}
           </RouterLink>

@@ -49,7 +49,7 @@ import { RouterLink } from 'vue-router'
     <section class="guide-section" aria-labelledby="todo-heading">
       <div class="section-heading">
         <h2 id="todo-heading">待办事项</h2>
-        <RouterLink to="/todo">打开待办事项 →</RouterLink>
+        <RouterLink to="/todo/list">打开待办事项 →</RouterLink>
       </div>
       <ul>
         <li>每行输入一条待办；用单独两行的 <code>```</code> 包住正文，可以添加一条多行待办。</li>

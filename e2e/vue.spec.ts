@@ -12,6 +12,6 @@ test('visits the app root url', async ({ page }) => {
   )
   await expect(page.locator('.tool-card').filter({ hasText: '待办事项' })).toHaveAttribute(
     'href',
-    '/todo',
+    '/todo/list',
   )
 })

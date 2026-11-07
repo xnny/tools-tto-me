@@ -23,7 +23,7 @@ const router = createRouter({
       meta: { title: '时间戳转换' },
     },
     {
-      path: '/todo',
+      path: '/todo/add',
       name: 'Todo',
       component: () => import('@/views/TodoView.vue'),
       meta: { title: '待办事项' },

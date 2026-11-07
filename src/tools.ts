@@ -30,7 +30,7 @@ export const tools: ToolItem[] = [
   },
   {
     name: 'Todo',
-    path: '/todo',
+    path: '/todo/list',
     title: '待办事项',
     description: '本地保存待办，支持批量添加、多行内容与完成状态管理。',
     icon: 'M9 5h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2m2-2h6v4H9V3Zm-1 11 3 3 5-6',

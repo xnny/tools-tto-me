@@ -1,5 +1,5 @@
 // Keep these paths in sync with the routes in src/router/index.ts.
-const appRoutes = /^\/(?:calendar\/?|timezone(?:\/utc(?:[+-]\d{1,2})?)?\/?|todo(?:\/list)?\/?|2af\/?|guide\/?|)$/i
+const appRoutes = /^\/(?:calendar\/?|timezone(?:\/utc(?:[+-]\d{1,2})?)?\/?|todo\/(?:add|list)\/?|2af\/?|guide\/?|)$/i
 
 export default {
   async fetch(request, env) {
